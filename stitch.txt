@@ -1,0 +1,2058 @@
+<!-- directions.txt -->
+Plan of execution:
+
+Map the backend architecture and modules.
+Enumerate all REST endpoints with methods, paths, auth, inputs/outputs, and roles.
+Summarize the domain model and relationships.
+Detail services, background jobs, security, and cross-cutting concerns.
+Propose a frontend architecture and screen-by-screen implementation plan wired to endpoints, including state shapes, forms, and role-based routes.
+Provide API payload schemas and enum catalogs for UI forms and validation.
+Provide a phased delivery plan and testing plan.
+Backend resume (Spring Boot blood bank system)
+
+High-level architecture
+Framework: Spring Boot (REST), Spring Security with JWT, Spring Data JPA.
+Layers:
+Controller layer: Auth, SuperAdmin, Admin, Donneur (donor), Patient, Notification, Public, Chatbot.
+Service layer: AuthService, DashboardService, AnalyticsService, DonneurService, DemandeSangService, StockService, GamificationService, NotificationService, CampagneService, ChatbotService, SuperAdminService.
+Repository layer: JPA repositories for entities Don, Donneur, Hopital, StockSang, DemandeSang, CampagneDon, Badge, DonneurBadge, Notification, RapportMensuel, StatistiquesQuotidiennes, Utilisateur.
+Security: JwtAuthenticationFilter, JwtUtil, SecurityConfig, UserDetailsServiceImpl, Custom access denied and entry point handlers.
+Schedulers: ScheduledTasks.
+Chatbot helpers: AIService, IntentDetector, FAQHandler, ActionHandler.
+DTOs: comprehensive request/response objects for all features.
+Enums: Roles, sexes, groups, statuses, urgency, notification types/priorities, etc.
+Docs: API_DOCUMENTATION.md and Postman collection provided.
+Domain model (inferred from package model)
+Utilisateur: base user, fields include id, email, motDePasse, role (enum Role), pointsTotal, may be linked to Hopital for ADMIN. Used by all auth and identity flows.
+Donneur: donor profile tied to a Utilisateur. Fields include cin, dateNaissance, sexe, groupeSanguin (GroupeSanguin), poids, adresse, ville, antecedentsMedicaux, eligible (Boolean), and historical donations.
+Hopital: hospital unit with identity fields (nom, adresse, ville, region, telephone, email), capaciteStockage, description, statut (StatutHopital). Linked to Admins and StockSang.
+StockSang: per-hospital stock quantities per group, with NiveauStock (critical/normal/high) handled in service.
+Don: donation records (donneur, hopital, quantiteMl, notes, dates for don/validation/peremption, numeroPoche, statut StatutDon).
+DemandeSang: patient demand (groupeSanguinDemande, quantiteDemandee, urgence, statut StatutDemande, patientId or Utilisateur as patient, dateDemande, hopital).
+CampagneDon: donation campaigns (nationale boolean or hopitalId, dates, actifs).
+Badge, DonneurBadge: gamification with NiveauBadge.
+Notification: user-targeted notifications with TypeNotification, PrioriteNotification, flags lue, timestamps, lienAction.
+RapportMensuel, StatistiquesQuotidiennes: analytics aggregates.
+Security model
+JWT-based authentication:
+Auth endpoints are public.
+All others protected by roles with @PreAuthorize.
+Role mapping:
+/api/superadmin/**: SUPER_ADMIN
+/api/admin/**: ADMIN or SUPER_ADMIN
+/api/donneur/** and /api/patient/**: USER, ADMIN, SUPER_ADMIN
+/api/notifications/**: isAuthenticated
+/api/public/**: open
+JwtAuthenticationFilter extracts and validates token; JwtUtil handles creation/parsing; UserDetailsServiceImpl loads users by email.
+Scheduled/background tasks
+ScheduledTasks likely performs:
+Expiration handling for Don (PERIME after 42 days).
+Stock threshold recalculation and urgent notifications.
+Aggregating daily/monthly analytics.
+Chatbot
+ChatbotController endpoints:
+POST /api/chatbot/message: processes message with optional user context (utilisateurId from auth if present) via ChatbotService.
+GET /api/chatbot/suggestions: suggestions and quick actions for UI.
+GET/DELETE /api/chatbot/historique: get/clear conversation history (by sessionId).
+GET /api/chatbot/health: health info for chatbot service.
+ChatbotService composes AIService, IntentDetector, FAQHandler, ActionHandler to return ChatMessageResponse. It can trigger app actions by intent (e.g., checking eligibility, listing campaigns, etc.).
+Endpoints: complete map with payloads, roles, and outputs
+Base URL: http://localhost:8080/api Auth: JWT Bearer, except /api/public and auth endpoints.
+
+A) Public
+
+GET /api/public/health
+Open. Returns status, timestamp, message.
+GET /api/public/test
+Open. Returns simple info message.
+B) Authentication /api/auth
+
+POST /api/auth/inscription
+Open. Body: InscriptionRequest { email, motDePasse, nom, prenom, telephone, role: USER|ADMIN|SUPER_ADMIN, hopitalId? (required for ADMIN) }
+Returns AuthResponse { token, utilisateur info } with 201.
+POST /api/auth/connexion
+Open. Body: ConnexionRequest { email, motDePasse }
+Returns AuthResponse { token, utilisateur info }.
+GET /api/auth/valider-token
+Header Authorization: Bearer
+Returns Boolean.
+C) Super Admin /api/superadmin (SUPER_ADMIN)
+
+POST /hopitaux
+Body: HopitalRequest { nom, adresse, ville, region, telephone, email, capaciteStockage, description }
+Creates Hospital with statut EN_ATTENTE. Returns HopitalResponse { id, nom, statut }.
+GET /hopitaux
+Returns List.
+GET /hopitaux/en-attente
+Returns List pending.
+PUT /hopitaux/{id}/valider
+Uses current SUPER_ADMIN id for audit. Returns HopitalResponse.
+PUT /hopitaux/{id}/suspendre
+Uses current SUPER_ADMIN id for audit. Returns HopitalResponse.
+GET /stats
+Returns StatistiquesGlobales (aggregates).
+GET /dashboard
+Returns DashboardAnalytics (rich dashboard info).
+POST /notifications/globale
+Body: NotificationRequest { titre, message, type: TypeNotification, priorite: PrioriteNotification }
+Sends global notification. Returns success string.
+POST /campagnes
+Body: CampagneRequest; Controller forces nationale=true. Uses current admin id for audit.
+Returns CampagneResponse.
+GET /campagnes/nationales
+Returns List.
+D) Admin Hospital /api/admin (ADMIN or SUPER_ADMIN)
+
+GET /dashboard
+Resolves current admin’s hopital; returns DashboardAnalytics for that hospital.
+GET /dons
+Returns List for admin’s hospital.
+PUT /dons/{id}/valider
+Validates donation: sets statut=VALIDE, dates, numeroPoche, adds stock via StockService, awards gamification points/badges.
+Returns updated Don.
+PUT /dons/{id}/rejeter
+Body: String raison. Sets statut=REJETE, saves notes. Returns Don.
+GET /demandes
+Returns List for admin’s hospital.
+GET /demandes/urgentes
+Returns List urgent across the system (by service rules).
+PUT /demandes/{id}/traiter?statut=EN_COURS|SATISFAITE|ANNULEE|REJETEE
+Uses admin id for audit. Returns updated DemandeSangResponse.
+GET /stocks
+Returns List for admin’s hospital.
+GET /stocks/critiques
+Returns List flagged critical.
+GET /donneurs
+Returns List eligible donors.
+GET /donneurs/top
+Returns top 10 donors.
+POST /campagnes
+Body: CampagneRequest; Controller sets hopitalId and nationale=false.
+Returns CampagneResponse.
+GET /campagnes/actives
+Returns List active.
+E) Donor /api/donneur (USER, ADMIN, SUPER_ADMIN)
+
+POST /profil
+Body: Donneur (entity fields). Creates donor profile for current user; returns DonneurResponse.
+GET /profil
+Returns current user’s DonneurResponse.
+POST /dons
+Body: DonRequest { hopitalId, quantiteMl, notes }. Validates eligibility; creates Don with EN_ATTENTE; returns Don.
+GET /dons/historique
+Returns List for current donor.
+GET /badges
+Returns List for current donor.
+GET /points
+Returns integer total points (from Utilisateur).
+GET /classement
+Returns top 50 donors (DonneurResponse).
+GET /campagnes
+Returns List active campaigns.
+POST /campagnes/{id}/participer
+Current donor participates; returns CampagneResponse.
+F) Patient /api/patient (USER, ADMIN, SUPER_ADMIN)
+
+POST /demandes
+Body: DemandeSangRequest { groupeSanguinDemande, quantiteDemandee, hopitalId, urgence NORMALE|HAUTE|CRITIQUE, nomPatient, prenomPatient, diagnostic, medecinPrescripteur, dateBesoin (ISO), notes }
+Returns DemandeSangResponse.
+GET /demandes
+Returns current user’s List.
+GET /demandes/{id}
+Returns one DemandeSangResponse (details).
+GET /stocks/{hopitalId}
+Returns List for hospital.
+G) Notifications /api/notifications (isAuthenticated)
+
+GET /
+Returns List for current user.
+GET /non-lues
+Returns List unread.
+GET /count
+Returns Long unread count.
+PUT /{id}/lire
+Marks notification read; returns NotificationResponse.
+PUT /tout-lire
+Marks all read for current user; returns message string.
+H) Chatbot /api/chatbot
+
+POST /message
+Body: ChatMessageRequest. If authenticated, associates utilisateurId. Returns ChatMessageResponse.
+GET /suggestions
+Returns { suggestions: string[], quickActions: any[] }.
+GET /historique?sessionId=optional
+Returns { messages: ChatMessageResponse[] or internal structure }.
+DELETE /historique?sessionId=optional
+Clears history; returns { message }.
+GET /health
+Returns service OK payload.
+DTOs and enums (for UI contracts)
+DTOs (names imply fields):
+AuthResponse: token, role, user details (id, name, maybe points).
+InscriptionRequest: email, motDePasse, nom, prenom, telephone, role, hopitalId? (ADMIN).
+ConnexionRequest: email, motDePasse.
+DonRequest: hopitalId, quantiteMl, notes.
+DonResponse: for list/history in some services (controller mostly returns entity Don).
+DonneurResponse: donor profile summary (id, user details, group, eligibility, stats).
+HopitalRequest/HopitalResponse: as used in controllers.
+CampagneRequest/CampagneResponse: creating/returning campaigns.
+DemandeSangRequest/DemandeSangResponse: see PatientController mapping for response fields.
+StockResponse: hospital stock per blood group with level.
+BadgeResponse: name, level, description, earnedAt, etc.
+NotificationRequest/Response: see NotificationController mapping; Response contains id, titre, message, type, priorite, lue, dateCreation, dateLecture, lienAction.
+DashboardStats/DashboardAnalytics/StatistiquesGlobales: aggregates for dashboards; used for /admin/dashboard and /superadmin/dashboard.
+Enums:
+Role: USER, ADMIN, SUPER_ADMIN.
+Sexe: HOMME, FEMME.
+GroupeSanguin: A_POSITIF, A_NEGATIF, B_POSITIF, B_NEGATIF, AB_POSITIF, AB_NEGATIF, O_POSITIF, O_NEGATIF.
+Urgence: NORMALE, HAUTE, CRITIQUE.
+StatutDon: EN_ATTENTE, VALIDE, REJETE, UTILISE, PERIME.
+StatutDemande: EN_ATTENTE, EN_COURS, SATISFAITE, ANNULEE, REJETEE.
+StatutHopital: EN_ATTENTE, VALIDE, SUSPENDU, REJETE.
+TypeNotification: INFO, ALERTE, URGENCE, SUCCES, RAPPEL, SYSTEME.
+PrioriteNotification: BASSE, NORMALE, HAUTE, CRITIQUE.
+NiveauStock, NiveauBadge, ChatIntent also exist for internal logic.
+Side effects/business rules worth noting for frontend behavior
+Donation validation by admin:
+On validation, stock is incremented and donor receives points and maybe badges.
+Poche number generated; peremption set to now + 42 days.
+Donor eligibility gate enforced at donor donation declaration.
+Admin must be associated to a Hopital to access dashboard and lists.
+Global and targeted notifications propagate to users; unread counts are available.
+Urgent demands endpoint aggregates high urgency items (for admin alert banners).
+Stocks critical endpoint for quick admin action.
+SuperAdmin must validate new hospitals before they can be used.
+Campaigns can be national (superadmin) or local (admin); donors can participate.
+Frontend blueprint (complete plan to build the app)
+
+Target stack and core setup
+SPA using React + TypeScript, Vite or CRA.
+Router: React Router v6 with role-based route guards.
+State/query: React Query for API calls caching; Redux optional for global auth/role/notification count, but React Query + context can suffice.
+UI kit: MUI or Ant Design.
+Forms: react-hook-form + zod/yup for validation.
+i18n: optional; current labels French.
+Auth: JWT stored in memory + localStorage; append Authorization: Bearer to all protected API calls. Auto-logout on 401/403.
+Error handling: Axios interceptors to catch 401/403/500; global toast/snackbar.
+Date handling: dayjs.
+Routing and roles
+Public
+/public/health (debug)
+/ (landing or login redirect)
+/auth/login
+/auth/register
+Protected (any authenticated)
+/notifications (list)
+/chatbot (assistant panel)
+Donor/Patient (USER, ADMIN, SUPER_ADMIN can access donor/patient areas per backend)
+/donneur/profil (create or view/update)
+/donneur/dons (history and declare new)
+/donneur/badges
+/donneur/points
+/donneur/classement
+/donneur/campagnes
+/patient/demandes (list + create)
+/patient/demandes/:id
+/stocks/:hopitalId (public consult stocks on patient area)
+Admin (ADMIN, SUPER_ADMIN)
+/admin/dashboard
+/admin/dons (list + validate/reject)
+/admin/demandes (list + urgent filter + traiter)
+/admin/stocks (list + critical view)
+/admin/donneurs (eligible + top10)
+/admin/campagnes (create + actives)
+Super Admin (SUPER_ADMIN)
+/superadmin/hopitaux (all + create)
+/superadmin/hopitaux/en-attente (validate/suspend)
+/superadmin/stats
+/superadmin/dashboard
+/superadmin/notifications (send global)
+/superadmin/campagnes (create national + list national)
+API clients (per endpoint group)
+Auth
+
+signup(data: InscriptionRequest): POST /api/auth/inscription
+login(data: ConnexionRequest): POST /api/auth/connexion
+validateToken(): GET /api/auth/valider-token
+Super Admin
+
+createHospital(data: HopitalRequest): POST /api/superadmin/hopitaux
+listHospitals(): GET /api/superadmin/hopitaux
+listHospitalsPending(): GET /api/superadmin/hopitaux/en-attente
+validateHospital(id): PUT /api/superadmin/hopitaux/{id}/valider
+suspendHospital(id): PUT /api/superadmin/hopitaux/{id}/suspendre
+getGlobalStats(): GET /api/superadmin/stats
+getDashboard(): GET /api/superadmin/dashboard
+sendGlobalNotification(data: NotificationRequest): POST /api/superadmin/notifications/globale
+createNationalCampaign(data: CampagneRequest): POST /api/superadmin/campagnes
+listNationalCampaigns(): GET /api/superadmin/campagnes/nationales
+Admin
+
+getDashboard(): GET /api/admin/dashboard
+listDonations(): GET /api/admin/dons
+validateDonation(id): PUT /api/admin/dons/{id}/valider
+rejectDonation(id, raison: string): PUT /api/admin/dons/{id}/rejeter body text/plain
+listDemands(): GET /api/admin/demandes
+listUrgentDemands(): GET /api/admin/demandes/urgentes
+processDemand(id, statut): PUT /api/admin/demandes/{id}/traiter?statut=...
+listStocks(): GET /api/admin/stocks
+listCriticalStocks(): GET /api/admin/stocks/critiques
+listEligibleDonors(): GET /api/admin/donneurs
+listTopDonors(): GET /api/admin/donneurs/top
+createLocalCampaign(data: CampagneRequest): POST /api/admin/campagnes
+listActiveCampaigns(): GET /api/admin/campagnes/actives
+Donor
+
+createProfile(data: Donneur): POST /api/donneur/profil
+getProfile(): GET /api/donneur/profil
+declareDonation(data: DonRequest): POST /api/donneur/dons
+donationHistory(): GET /api/donneur/dons/historique
+myBadges(): GET /api/donneur/badges
+myPoints(): GET /api/donneur/points
+leaderboard(): GET /api/donneur/classement
+availableCampaigns(): GET /api/donneur/campagnes
+participateCampaign(id): POST /api/donneur/campagnes/{id}/participer
+Patient
+
+createDemand(data: DemandeSangRequest): POST /api/patient/demandes
+myDemands(): GET /api/patient/demandes
+demandDetails(id): GET /api/patient/demandes/{id}
+viewStocks(hopitalId): GET /api/patient/stocks/{hopitalId}
+Notifications
+
+myNotifications(): GET /api/notifications
+unread(): GET /api/notifications/non-lues
+unreadCount(): GET /api/notifications/count
+markRead(id): PUT /api/notifications/{id}/lire
+markAllRead(): PUT /api/notifications/tout-lire
+Chatbot
+
+sendMessage(data: ChatMessageRequest): POST /api/chatbot/message
+getSuggestions(): GET /api/chatbot/suggestions
+getHistory(sessionId?): GET /api/chatbot/historique
+clearHistory(sessionId?): DELETE /api/chatbot/historique
+health(): GET /api/chatbot/health
+Public
+
+health(): GET /api/public/health
+test(): GET /api/public/test
+Screen-by-screen UI plan and data contracts
+Auth
+
+Register (SuperAdmin, Admin, Donor):
+Form: role select; if role=ADMIN require hospital select (populated from /superadmin/hopitaux when logged as superadmin to create admins, or allow self-register to ADMIN with hopitalId known).
+POST /api/auth/inscription; on success: store token and route by role.
+Login:
+POST /api/auth/connexion; save token/role; fetch profile minimal.
+Super Admin area
+
+Hospitals list:
+GET /api/superadmin/hopitaux: table with status tags; actions: validate/suspend visible by status.
+Create hospital drawer: POST /api/superadmin/hopitaux with form validation.
+Pending hospitals:
+GET /api/superadmin/hopitaux/en-attente: list with approve/reject.
+Global dashboard:
+GET /api/superadmin/dashboard: cards, charts for totals, per-region stocks, active campaigns, new registrations, expiring stocks.
+Global stats:
+GET /api/superadmin/stats: KPI cards and trend charts.
+Global notification:
+POST /api/superadmin/notifications/globale: form with titre, message, type, priorite; after submit show toast.
+Campaigns:
+Create national: POST /api/superadmin/campagnes.
+List national: GET /api/superadmin/campagnes/nationales.
+Admin hospital area
+
+Dashboard:
+GET /api/admin/dashboard: widgets for today’s donations/demands, stock levels by group, urgent demands, campaign participation.
+Donations:
+GET /api/admin/dons: table; row actions validate/reject.
+Validate:
+PUT /api/admin/dons/{id}/valider; optimistic refresh of stock and donor points.
+Reject:
+PUT /api/admin/dons/{id}/rejeter with reason in body (text/plain).
+Demands:
+GET /api/admin/demandes and /urgentes: table with filters; action to set statut via PUT /traiter?statut=...
+Stocks:
+GET /api/admin/stocks: grid by group with color-coded NiveauStock; refresh after validations/demands.
+GET /api/admin/stocks/critiques: alert panel/badge on navbar.
+Donors:
+GET /api/admin/donneurs: list of eligible donors with contact.
+GET /api/admin/donneurs/top: leaderboard.
+Campaigns:
+Create local: POST /api/admin/campagnes.
+Active campaigns: GET /api/admin/campagnes/actives.
+Donor area
+
+Profile:
+GET /api/donneur/profil; if 404/empty, render create form POST /api/donneur/profil.
+Declare donation:
+POST /api/donneur/dons; form includes hospital selection (from admin-provided lists or typeahead) and quantity (e.g., 450 ml default) + notes; show eligibility message if backend rejects.
+History:
+GET /api/donneur/dons/historique: timeline/table; status chips; show poche number when validated.
+Badges and points:
+GET /api/donneur/badges; GET /api/donneur/points; leaderboard via GET /classement.
+Campaigns:
+GET /api/donneur/campagnes; action to participate via POST /campagnes/{id}/participer.
+Patient area
+
+My demands:
+List: GET /api/patient/demandes.
+Create: POST /api/patient/demandes with form including group enum select, urgency select, date/time picker, hospital select, details.
+Detail: GET /api/patient/demandes/{id}.
+Stocks view:
+GET /api/patient/stocks/{hopitalId}: show hospital blood availability by group.
+Notifications
+
+Bell icon with badge from GET /api/notifications/count (poll or server-sent alt).
+Panel:
+GET /api/notifications and /non-lues.
+Mark read: PUT /api/notifications/{id}/lire.
+Mark all read: PUT /api/notifications/tout-lire.
+Chatbot
+
+Slide-over panel component with:
+Suggestions and quick actions: GET /api/chatbot/suggestions.
+Conversation: POST /api/chatbot/message, GET /api/chatbot/historique, DELETE /api/chatbot/historique.
+Use returned intents to deep-link into app (e.g., open donation form).
+Shared UI data and validators
+Enums drive selects: map to exact backend values (e.g., O_POSITIF).
+Date-time ISO 8601; ensure timezone handling.
+Phone format 10 digits.
+Weight min 50 kg on donor profile.
+Token valid 24h; implement token expiry check and refresh to login.
+State management shapes (examples)
+auth: { token: string, user: { id, email, role, pointsTotal? }, expiresAt }
+notifications: { countUnread: number, items: NotificationResponse[] }
+hospital: { list: Hopital[], pending: HopitalResponse[] }
+stocks: { byHospitalId: Record<number, StockResponse[]> }
+donor: { profile?: DonneurResponse, badges: BadgeResponse[], points: number, history: Don[] }
+admin: { donations: Don[], demands: DemandeSangResponse[], urgent: DemandeSangResponse[] }
+campaigns: { active: CampagneResponse[], national: CampagneResponse[] }
+Navigation and access control
+Guard routes by role; redirect to role home:
+SUPER_ADMIN -> /superadmin/dashboard
+ADMIN -> /admin/dashboard
+USER -> /donneur/profil (or /patient/demandes)
+If role is ADMIN or SUPER_ADMIN, still allow donor/patient endpoints (backend allows). Show a role switch or multi-home.
+Component checklist by view (deliverable granularity)
+Shared: AppBar with role/points, NotificationsBell, ChatbotButton, SideNav with role sections.
+Forms:
+Auth: LoginForm, RegisterForm (role selection, conditional hopitalId).
+DonorProfileForm: validation for enums and min weight.
+DonationForm: select hospital, quantity (number), notes.
+PatientDemandForm: full schema with date-time pickers.
+HospitalForm: admin-only creation.
+CampaignForm: admin/superadmin create.
+GlobalNotificationForm.
+DemandStatusAction: status select buttons with confirmation.
+RejectDonationDialog: reason textarea posts text/plain.
+Tables/grids with server data and pagination where needed.
+Error and edge cases the UI must handle
+403 forbidden: guide users to login or correct role, per the API doc hints.
+Missing donor profile when accessing donor features: prompt to create profile.
+Admin without hospital association: show blocking error from /admin/dashboard.
+Token expiry: auto-logout.
+Numeric inputs: quantiteMl numeric only and common sizes (350/450).
+Backend may return raw entity for some endpoints (Don). Handle unknown fields gracefully.
+Testing plan (frontend and integration)
+Use the provided Postman collection to verify all endpoints with a seeded flow:
+Register SUPER_ADMIN; validate token; create a hospital; validate hospital.
+Register ADMIN tied to hospital.
+Register USER (donor); create donor profile; declare donation.
+As ADMIN, validate donation; check stocks and donor points/badges.
+As USER, create patient demand; as ADMIN, process demand and observe stock changes if applicable.
+Send a global notification and verify counts and list.
+Create campaigns (national and local); list and participate.
+Frontend integration tests:
+Auth guards on each route.
+Forms validation and API contracts.
+Notification bell updating after mark read/all read.
+Chatbot health and messaging.
+Delivery phases
+Phase 1: Project scaffolding, auth, layout, enums/constants, axios client with JWT, public health page.
+Phase 2: Donor area (profile, donation, history, badges, points, leaderboard).
+Phase 3: Patient area (demands CRUD, stocks view).
+Phase 4: Admin area (dashboard, donations, demands, stocks, donors, campaigns).
+Phase 5: SuperAdmin area (hospitals, dashboard, stats, global notifications, national campaigns).
+Phase 6: Notifications center and global bell.
+Phase 7: Chatbot panel integration.
+Phase 8: Polish, role switcher, error pages, testing automation.
+Example payload schemas for forms (for immediate UI wiring)
+InscriptionRequest
+
+{ email: string, motDePasse: string, nom: string, prenom: string, telephone: string, role: "USER"|"ADMIN"|"SUPER_ADMIN", hopitalId?: number }
+ConnexionRequest
+
+{ email: string, motDePasse: string }
+Donneur (create profile)
+
+{ cin: string, dateNaissance: string (YYYY-MM-DD), sexe: "HOMME"|"FEMME", groupeSanguin: "A_POSITIF"|"A_NEGATIF"|..., poids: number, adresse: string, ville: string, antecedentsMedicaux?: string }
+DonRequest
+
+{ hopitalId: number, quantiteMl: number, notes?: string }
+DemandeSangRequest
+
+{ groupeSanguinDemande: GroupeSanguin, quantiteDemandee: number, hopitalId: number, urgence: "NORMALE"|"HAUTE"|"CRITIQUE", nomPatient: string, prenomPatient: string, diagnostic: string, medecinPrescripteur: string, dateBesoin: string (ISO), notes?: string }
+HopitalRequest
+
+{ nom: string, adresse: string, ville: string, region: string, telephone: string, email: string, capaciteStockage: number, description?: string }
+NotificationRequest
+
+{ titre: string, message: string, type: "INFO"|"ALERTE"|"URGENCE"|"SUCCES"|"RAPPEL"|"SYSTEME", priorite: "BASSE"|"NORMALE"|"HAUTE"|"CRITIQUE" }
+CampagneRequest
+
+{ titre: string, description?: string, dateDebut: string (ISO), dateFin: string (ISO), hopitalId?: number (set by admin path), nationale?: boolean (true in superadmin path) }
+Observed conventions to match in frontend
+All endpoints start with /api and are CORS-enabled with origins="*".
+Most controllers return ResponseEntity with direct entities or DTOs; types are stable.
+Dates returned as ISO strings.
+Status management relies on enums; use exact enum strings.
+Next steps to implement
+Generate a .env for base URL and configure axios with bearer token.
+Create a TypeScript types module from DTOs/enums above.
+Scaffold routes and guards with a role-aware PrivateRoute wrapper.
+Build API client modules grouping by resource, matching paths and methods listed.
+Implement screens per the phases, starting with Auth and Donor Profile.
+
+
+<!-- directions.txt -->
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Hospital Admin Dashboard Overview - Blood Bank System</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        :root {
+            --primary-red: #DC2626;--primary-red-hover: #B91C1C;--primary-bg: #F9FAFB;--sidebar-width: 260px;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--primary-bg);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            font-size: 24px;
+        }
+        .material-symbols-outlined.filled {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden text-gray-800">
+<aside class="w-[var(--sidebar-width)] bg-white border-r border-gray-200 flex-shrink-0 flex flex-col h-full fixed md:relative z-20">
+<div class="h-16 flex items-center px-6 border-b border-gray-100">
+<div class="flex items-center gap-2 text-[var(--primary-red)] font-bold text-xl">
+<span class="material-symbols-outlined filled text-3xl">bloodtype</span>
+<span>LifeFlow Admin</span>
+</div>
+</div>
+<nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2.5 bg-red-50 text-[var(--primary-red)] rounded-lg font-medium" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+                Dashboard
+            </a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg transition-colors font-medium" href="#">
+<span class="material-symbols-outlined">volunteer_activism</span>
+                Donations
+            </a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg transition-colors font-medium" href="#">
+<span class="material-symbols-outlined">emergency</span>
+                Demands
+            </a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg transition-colors font-medium" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+                Stocks
+            </a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg transition-colors font-medium" href="#">
+<span class="material-symbols-outlined">group</span>
+                Donors
+            </a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg transition-colors font-medium" href="#">
+<span class="material-symbols-outlined">campaign</span>
+                Campaigns
+            </a>
+</nav>
+<div class="p-4 border-t border-gray-100">
+<div class="flex items-center gap-3 px-2">
+<div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-[var(--primary-red)] font-bold">
+                    SA
+                </div>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-semibold text-gray-900 truncate">St. Anne Hospital</p>
+<p class="text-xs text-gray-500 truncate">Admin Console</p>
+</div>
+<button class="text-gray-400 hover:text-gray-600">
+<span class="material-symbols-outlined">logout</span>
+</button>
+</div>
+</div>
+</aside>
+<main class="flex-1 flex flex-col h-full overflow-hidden relative">
+<header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 md:px-8">
+<div class="flex items-center gap-4">
+<h1 class="text-xl font-semibold text-gray-800">Dashboard Overview</h1>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden md:flex relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg">search</span>
+<input class="pl-10 pr-4 py-2 border border-gray-300 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent w-64" placeholder="Search donors, demands..." type="text"/>
+</div>
+<button class="relative p-2 text-gray-500 hover:bg-gray-50 rounded-full transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-4 h-4 bg-red-600 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white">3</span>
+</button>
+<button class="p-2 text-gray-500 hover:bg-gray-50 rounded-full transition-colors">
+<span class="material-symbols-outlined">smart_toy</span>
+</button>
+</div>
+</header>
+<div class="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
+<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+<div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex flex-col">
+<div class="flex items-center justify-between mb-4">
+<div class="text-gray-500 text-sm font-medium">Total Donations Today</div>
+<div class="p-2 bg-red-50 rounded-lg text-red-600">
+<span class="material-symbols-outlined">water_drop</span>
+</div>
+</div>
+<div class="flex items-end gap-2 mt-auto">
+<span class="text-3xl font-bold text-gray-900">24</span>
+<span class="text-sm font-medium text-green-600 flex items-center mb-1">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+                            +12%
+                        </span>
+</div>
+<p class="text-xs text-gray-400 mt-1">Vs. yesterday</p>
+</div>
+<div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex flex-col">
+<div class="flex items-center justify-between mb-4">
+<div class="text-gray-500 text-sm font-medium">Pending Demands</div>
+<div class="p-2 bg-orange-50 rounded-lg text-orange-600">
+<span class="material-symbols-outlined">pending_actions</span>
+</div>
+</div>
+<div class="flex items-end gap-2 mt-auto">
+<span class="text-3xl font-bold text-gray-900">8</span>
+<span class="text-sm font-medium text-red-600 flex items-center mb-1">
+<span class="material-symbols-outlined text-sm">priority_high</span>
+                            Action needed
+                        </span>
+</div>
+<p class="text-xs text-gray-400 mt-1">3 Critical priority</p>
+</div>
+<div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex flex-col">
+<div class="flex items-center justify-between mb-4">
+<div class="text-gray-500 text-sm font-medium">Critical Stock Levels</div>
+<div class="p-2 bg-red-100 rounded-lg text-red-700">
+<span class="material-symbols-outlined">warning</span>
+</div>
+</div>
+<div class="flex items-end gap-2 mt-auto">
+<span class="text-3xl font-bold text-gray-900">2</span>
+<span class="text-sm font-medium text-gray-500 mb-1">Blood Types</span>
+</div>
+<p class="text-xs text-gray-400 mt-1">O- and AB- are low</p>
+</div>
+<div class="bg-white rounded-xl p-5 shadow-sm border border-gray-100 flex flex-col">
+<div class="flex items-center justify-between mb-4">
+<div class="text-gray-500 text-sm font-medium">Active Campaigns</div>
+<div class="p-2 bg-blue-50 rounded-lg text-blue-600">
+<span class="material-symbols-outlined">campaign</span>
+</div>
+</div>
+<div class="flex items-end gap-2 mt-auto">
+<span class="text-3xl font-bold text-gray-900">1</span>
+<span class="text-sm font-medium text-blue-600 mb-1">Ongoing</span>
+</div>
+<p class="text-xs text-gray-400 mt-1">Ends in 5 days</p>
+</div>
+</section>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<section class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+<div class="p-6 border-b border-gray-100 flex justify-between items-center">
+<h2 class="text-lg font-semibold text-gray-800">Blood Stock Status</h2>
+<a class="text-sm text-[var(--primary-red)] hover:underline font-medium" href="#">View detailed inventory</a>
+</div>
+<div class="p-6">
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-6">
+<div class="flex flex-col items-center group">
+<div class="relative w-16 h-20 mb-3">
+<svg class="w-full h-full text-green-500 drop-shadow-sm" fill="currentColor" viewBox="0 0 24 24">
+<path d="M12 2C12 2 4 10 4 15C4 19.4183 7.58172 23 12 23C16.4183 23 20 19.4183 20 15C20 10 12 2 12 2Z"></path>
+</svg>
+<span class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pt-2 text-white font-bold text-lg drop-shadow-md">A+</span>
+</div>
+<div class="w-full bg-gray-100 rounded-full h-2.5 mb-1 overflow-hidden">
+<div class="bg-green-500 h-2.5 rounded-full" style="width: 85%"></div>
+</div>
+<span class="text-xs font-medium text-gray-500">85 Units (Normal)</span>
+</div>
+<div class="flex flex-col items-center group">
+<div class="relative w-16 h-20 mb-3">
+<svg class="w-full h-full text-yellow-400 drop-shadow-sm" fill="currentColor" viewBox="0 0 24 24">
+<path d="M12 2C12 2 4 10 4 15C4 19.4183 7.58172 23 12 23C16.4183 23 20 19.4183 20 15C20 10 12 2 12 2Z"></path>
+</svg>
+<span class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pt-2 text-white font-bold text-lg drop-shadow-md">A-</span>
+</div>
+<div class="w-full bg-gray-100 rounded-full h-2.5 mb-1 overflow-hidden">
+<div class="bg-yellow-400 h-2.5 rounded-full" style="width: 35%"></div>
+</div>
+<span class="text-xs font-medium text-gray-500">35 Units (Low)</span>
+</div>
+<div class="flex flex-col items-center group">
+<div class="relative w-16 h-20 mb-3">
+<svg class="w-full h-full text-green-500 drop-shadow-sm" fill="currentColor" viewBox="0 0 24 24">
+<path d="M12 2C12 2 4 10 4 15C4 19.4183 7.58172 23 12 23C16.4183 23 20 19.4183 20 15C20 10 12 2 12 2Z"></path>
+</svg>
+<span class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pt-2 text-white font-bold text-lg drop-shadow-md">B+</span>
+</div>
+<div class="w-full bg-gray-100 rounded-full h-2.5 mb-1 overflow-hidden">
+<div class="bg-green-500 h-2.5 rounded-full" style="width: 72%"></div>
+</div>
+<span class="text-xs font-medium text-gray-500">72 Units (Normal)</span>
+</div>
+<div class="flex flex-col items-center group">
+<div class="relative w-16 h-20 mb-3">
+<svg class="w-full h-full text-green-500 drop-shadow-sm" fill="currentColor" viewBox="0 0 24 24">
+<path d="M12 2C12 2 4 10 4 15C4 19.4183 7.58172 23 12 23C16.4183 23 20 19.4183 20 15C20 10 12 2 12 2Z"></path>
+</svg>
+<span class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pt-2 text-white font-bold text-lg drop-shadow-md">B-</span>
+</div>
+<div class="w-full bg-gray-100 rounded-full h-2.5 mb-1 overflow-hidden">
+<div class="bg-green-500 h-2.5 rounded-full" style="width: 60%"></div>
+</div>
+<span class="text-xs font-medium text-gray-500">60 Units (Normal)</span>
+</div>
+<div class="flex flex-col items-center group">
+<div class="relative w-16 h-20 mb-3">
+<svg class="w-full h-full text-green-500 drop-shadow-sm" fill="currentColor" viewBox="0 0 24 24">
+<path d="M12 2C12 2 4 10 4 15C4 19.4183 7.58172 23 12 23C16.4183 23 20 19.4183 20 15C20 10 12 2 12 2Z"></path>
+</svg>
+<span class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pt-2 text-white font-bold text-lg drop-shadow-md">AB+</span>
+</div>
+<div class="w-full bg-gray-100 rounded-full h-2.5 mb-1 overflow-hidden">
+<div class="bg-green-500 h-2.5 rounded-full" style="width: 55%"></div>
+</div>
+<span class="text-xs font-medium text-gray-500">55 Units (Normal)</span>
+</div>
+<div class="flex flex-col items-center group">
+<div class="relative w-16 h-20 mb-3">
+<svg class="w-full h-full text-red-500 drop-shadow-sm" fill="currentColor" viewBox="0 0 24 24">
+<path d="M12 2C12 2 4 10 4 15C4 19.4183 7.58172 23 12 23C16.4183 23 20 19.4183 20 15C20 10 12 2 12 2Z"></path>
+</svg>
+<span class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pt-2 text-white font-bold text-lg drop-shadow-md">AB-</span>
+</div>
+<div class="w-full bg-gray-100 rounded-full h-2.5 mb-1 overflow-hidden">
+<div class="bg-red-500 h-2.5 rounded-full" style="width: 15%"></div>
+</div>
+<span class="text-xs font-medium text-gray-500">15 Units (Critical)</span>
+</div>
+<div class="flex flex-col items-center group">
+<div class="relative w-16 h-20 mb-3">
+<svg class="w-full h-full text-green-500 drop-shadow-sm" fill="currentColor" viewBox="0 0 24 24">
+<path d="M12 2C12 2 4 10 4 15C4 19.4183 7.58172 23 12 23C16.4183 23 20 19.4183 20 15C20 10 12 2 12 2Z"></path>
+</svg>
+<span class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pt-2 text-white font-bold text-lg drop-shadow-md">O+</span>
+</div>
+<div class="w-full bg-gray-100 rounded-full h-2.5 mb-1 overflow-hidden">
+<div class="bg-green-500 h-2.5 rounded-full" style="width: 90%"></div>
+</div>
+<span class="text-xs font-medium text-gray-500">90 Units (Normal)</span>
+</div>
+<div class="flex flex-col items-center group">
+<div class="relative w-16 h-20 mb-3">
+<svg class="w-full h-full text-red-500 drop-shadow-sm" fill="currentColor" viewBox="0 0 24 24">
+<path d="M12 2C12 2 4 10 4 15C4 19.4183 7.58172 23 12 23C16.4183 23 20 19.4183 20 15C20 10 12 2 12 2Z"></path>
+</svg>
+<span class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pt-2 text-white font-bold text-lg drop-shadow-md">O-</span>
+</div>
+<div class="w-full bg-gray-100 rounded-full h-2.5 mb-1 overflow-hidden">
+<div class="bg-red-500 h-2.5 rounded-full" style="width: 10%"></div>
+</div>
+<span class="text-xs font-medium text-gray-500">10 Units (Critical)</span>
+</div>
+</div>
+</div>
+</section>
+<section class="space-y-6">
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+<h3 class="font-semibold text-gray-800 mb-4">Urgent Actions Required</h3>
+<ul class="space-y-4">
+<li class="flex items-start gap-3 pb-3 border-b border-gray-50 last:border-0 last:pb-0">
+<div class="w-2 h-2 mt-2 rounded-full bg-red-500 flex-shrink-0"></div>
+<div>
+<p class="text-sm text-gray-800 font-medium">Validation Pending</p>
+<p class="text-xs text-gray-500">5 new donations from yesterday need validation.</p>
+<a class="text-xs text-blue-600 hover:underline mt-1 block" href="#">Go to Validation</a>
+</div>
+</li>
+<li class="flex items-start gap-3 pb-3 border-b border-gray-50 last:border-0 last:pb-0">
+<div class="w-2 h-2 mt-2 rounded-full bg-orange-500 flex-shrink-0"></div>
+<div>
+<p class="text-sm text-gray-800 font-medium">Low Stock Alert: O-</p>
+<p class="text-xs text-gray-500">Trigger a targeted campaign for O- donors?</p>
+<button class="text-xs bg-red-50 text-red-600 px-2 py-1 rounded mt-1 hover:bg-red-100 transition-colors">Start Campaign</button>
+</div>
+</li>
+</ul>
+</div>
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center text-center h-48 bg-gradient-to-br from-white to-gray-50">
+<span class="material-symbols-outlined text-gray-300 text-5xl mb-2">bar_chart</span>
+<p class="text-sm font-medium text-gray-500">Weekly Analytics</p>
+<p class="text-xs text-gray-400">Loading charts...</p>
+</div>
+</section>
+</div>
+<section class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+<div class="p-6 border-b border-gray-100 flex justify-between items-center">
+<h2 class="text-lg font-semibold text-gray-800">Recent Urgent Demands</h2>
+<div class="flex gap-2">
+<button class="text-gray-500 hover:text-gray-700">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+<button class="text-gray-500 hover:text-gray-700">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+<th class="p-4 font-semibold">Patient Name</th>
+<th class="p-4 font-semibold">Blood Type</th>
+<th class="p-4 font-semibold">Hospital/Unit</th>
+<th class="p-4 font-semibold">Urgency</th>
+<th class="p-4 font-semibold">Date Requested</th>
+<th class="p-4 font-semibold text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-gray-100 text-sm">
+<tr class="hover:bg-gray-50 transition-colors group">
+<td class="p-4 font-medium text-gray-900">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">JD</div>
+                                        John Doe
+                                    </div>
+</td>
+<td class="p-4">
+<span class="px-2 py-1 rounded bg-red-100 text-red-700 font-bold text-xs">O- NEG</span>
+</td>
+<td class="p-4 text-gray-500">ICU - Bed 4</td>
+<td class="p-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
+<span class="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
+                                        CRITICAL
+                                    </span>
+</td>
+<td class="p-4 text-gray-500">Oct 24, 10:30 AM</td>
+<td class="p-4 text-right">
+<button class="bg-[var(--primary-red)] hover:bg-[var(--primary-red-hover)] text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm transition-colors">
+                                        Treat Demand
+                                    </button>
+</td>
+</tr>
+<tr class="hover:bg-gray-50 transition-colors group">
+<td class="p-4 font-medium text-gray-900">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xs font-bold">SM</div>
+                                        Sarah Miller
+                                    </div>
+</td>
+<td class="p-4">
+<span class="px-2 py-1 rounded bg-gray-100 text-gray-700 font-bold text-xs">A+ POS</span>
+</td>
+<td class="p-4 text-gray-500">Emergency Room</td>
+<td class="p-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+                                        HIGH
+                                    </span>
+</td>
+<td class="p-4 text-gray-500">Oct 24, 11:15 AM</td>
+<td class="p-4 text-right">
+<button class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm transition-colors">
+                                        Treat Demand
+                                    </button>
+</td>
+</tr>
+<tr class="hover:bg-gray-50 transition-colors group">
+<td class="p-4 font-medium text-gray-900">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xs font-bold">RB</div>
+                                        Robert Brown
+                                    </div>
+</td>
+<td class="p-4">
+<span class="px-2 py-1 rounded bg-gray-100 text-gray-700 font-bold text-xs">AB- NEG</span>
+</td>
+<td class="p-4 text-gray-500">Surgery Dept</td>
+<td class="p-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
+                                        HIGH
+                                    </span>
+</td>
+<td class="p-4 text-gray-500">Oct 24, 09:45 AM</td>
+<td class="p-4 text-right">
+<button class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm transition-colors">
+                                        Treat Demand
+                                    </button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-4 border-t border-gray-100 bg-gray-50 flex justify-center">
+<button class="text-sm text-gray-500 hover:text-[var(--primary-red)] font-medium flex items-center gap-1">
+                        View All Demands
+                        <span class="material-symbols-outlined text-lg">arrow_forward</span>
+</button>
+</div>
+</section>
+</div>
+</main>
+
+</body></html>
+
+<!-- directions.txt -->
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Donor Profile &amp; Donation Form</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        :root {
+            --primary-red: #E63946;
+            --soft-red: #FEE2E2;
+            --dark-text: #1F2937;
+            --light-text: #6B7280;
+            --bg-gray: #F9FAFB;
+        }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--bg-gray);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body class="min-h-screen text-gray-800">
+<nav class="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex justify-between h-16">
+<div class="flex">
+<div class="flex-shrink-0 flex items-center gap-2">
+<span class="material-symbols-outlined text-[var(--primary-red)] text-3xl">bloodtype</span>
+<span class="font-bold text-xl tracking-tight text-gray-900">LifeBlood</span>
+</div>
+<div class="hidden sm:ml-8 sm:flex sm:space-x-8">
+<a class="border-[var(--primary-red)] text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium" href="#">Dashboard</a>
+<a class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium" href="#">History</a>
+<a class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium" href="#">Campaigns</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1 right-1 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"></span>
+</button>
+<div class="flex items-center gap-2">
+<img alt="" class="h-8 w-8 rounded-full bg-gray-300 object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDw3cLnVMJVs1ifh102gfTDH-VbYAbe4m4Cmbtv3tiFJJnnYWg8ID5HO2ms_byUdwAAe8Hku2H-7CKHpCWw5NubfrUAexQuIqG4NzhkyiDoTXQJN4lTq4QgrKtNFyZ-0YzQLcM1B2A_w8oCDOLZL07NPK36TsgiCC75MvMWsbxutf5qAZiw6gEpXzYq4vmD_tk45b9MbFaMZCfdVT1fsVNXf2Vt_1o961ZBu_LlPdor_f9dNN7hL0a3oirvp_3lY-D1Sf-HcqwanI4"/>
+<span class="text-sm font-medium text-gray-700 hidden md:block">Alex Doe</span>
+</div>
+</div>
+</div>
+</div>
+</nav>
+<main class="max-w-7xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+<div class="lg:col-span-4 space-y-6">
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative">
+<div class="h-32 bg-gradient-to-r from-red-500 to-rose-600"></div>
+<div class="px-6 pb-6 relative">
+<div class="absolute -top-12 left-6">
+<div class="h-24 w-24 rounded-full border-4 border-white bg-white shadow-md overflow-hidden">
+<img alt="Donor Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAye0tNrjpqlPQyyEWzC7bcKl3gbNgcQ34oGF29wN-h7Amk17SxDfxTB4_pzT7JZeL1IfFVGh_Qk54FPQsXICNg_1u8oiyJb8fyWRBFss6YNvqE0s5Hiqjj1qUKNWeiru0ZOR7tTCO87PV6gT_m9_3YdWROpnEXxbzBF5u4VnpPQmBOvUWQx7MIbkf8JPG3cyF8hr1iSAdwtqVhd46os3sZuE32N4CkGTG6eMBcIDclF5mZ967vI-uy5Iw64_WHoW3AGgRlD4tpvRU"/>
+</div>
+</div>
+<div class="mt-14 flex justify-between items-start">
+<div>
+<h2 class="text-2xl font-bold text-gray-900">Alex Doe</h2>
+<p class="text-sm text-gray-500 flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-base">location_on</span> San Francisco, CA
+                                </p>
+</div>
+<div class="bg-red-50 text-[var(--primary-red)] px-3 py-1 rounded-full text-xs font-semibold border border-red-100">
+                                Active Donor
+                            </div>
+</div>
+<div class="mt-6 flex items-center justify-between p-4 bg-red-50 rounded-xl border border-red-100">
+<div>
+<p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Blood Group</p>
+<p class="text-3xl font-extrabold text-[var(--primary-red)] mt-1">O+</p>
+</div>
+<span class="material-symbols-outlined text-red-200 text-5xl">water_drop</span>
+</div>
+<div class="mt-6 grid grid-cols-2 gap-4">
+<div class="bg-gray-50 p-3 rounded-lg border border-gray-100">
+<p class="text-xs text-gray-500">Last Donation</p>
+<p class="font-semibold text-gray-800 mt-1">Oct 12, 2023</p>
+</div>
+<div class="bg-gray-50 p-3 rounded-lg border border-gray-100">
+<p class="text-xs text-gray-500">Next Eligible</p>
+<p class="font-semibold text-green-600 mt-1">Available Now</p>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-semibold text-gray-900">Your Impact</h3>
+<span class="bg-yellow-50 text-yellow-700 px-2 py-1 rounded-md text-xs font-bold border border-yellow-200">1,250 Pts</span>
+</div>
+<div class="space-y-4">
+<div class="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-lg transition-colors cursor-default">
+<div class="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center text-[var(--primary-red)]">
+<span class="material-symbols-outlined">volunteer_activism</span>
+</div>
+<div>
+<p class="text-sm font-medium text-gray-900">Life Saver</p>
+<p class="text-xs text-gray-500">5 Donations completed</p>
+</div>
+</div>
+<div class="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-lg transition-colors cursor-default">
+<div class="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+<span class="material-symbols-outlined">verified</span>
+</div>
+<div>
+<p class="text-sm font-medium text-gray-900">Regular Hero</p>
+<p class="text-xs text-gray-500">Donated 3 times this year</p>
+</div>
+</div>
+<div class="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-lg transition-colors cursor-default opacity-60">
+<div class="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+<span class="material-symbols-outlined">social_leaderboard</span>
+</div>
+<div>
+<p class="text-sm font-medium text-gray-900">Champion (Locked)</p>
+<p class="text-xs text-gray-500">Reach 10 total donations</p>
+</div>
+</div>
+</div>
+<button class="w-full mt-4 text-sm text-[var(--primary-red)] font-medium hover:underline">View all badges</button>
+</div>
+</div>
+<div class="lg:col-span-8">
+<div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 h-full">
+<div class="flex items-center gap-3 mb-6">
+<div class="h-12 w-12 rounded-xl bg-red-50 flex items-center justify-center text-[var(--primary-red)]">
+<span class="material-symbols-outlined text-2xl">edit_calendar</span>
+</div>
+<div>
+<h2 class="text-2xl font-bold text-gray-900">Declare New Donation</h2>
+<p class="text-sm text-gray-500">Schedule your next visit to save a life.</p>
+</div>
+</div>
+<div class="mb-8 bg-green-50 border border-green-200 rounded-xl p-4 flex items-start gap-3">
+<span class="material-symbols-outlined text-green-600 mt-0.5">check_circle</span>
+<div>
+<h4 class="text-sm font-bold text-green-800">You are eligible to donate!</h4>
+<p class="text-sm text-green-700 mt-1">Based on your last donation date (Oct 12, 2023), you have passed the mandatory 56-day waiting period. Thank you for your commitment.</p>
+</div>
+</div>
+<form action="#" class="space-y-6" method="POST">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="col-span-2">
+<label class="block text-sm font-medium text-gray-700 mb-2" for="hospital">Select Donation Center / Hospital</label>
+<div class="relative">
+<span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+<span class="material-symbols-outlined">local_hospital</span>
+</span>
+<select class="block w-full pl-10 pr-10 py-3 text-base border-gray-300 focus:outline-none focus:ring-[var(--primary-red)] focus:border-[var(--primary-red)] sm:text-sm rounded-lg shadow-sm" id="hospital" name="hospital">
+<option>City General Hospital</option>
+<option>St. Mary's Medical Center</option>
+<option>Red Cross Downtown Center</option>
+<option>University Blood Bank</option>
+</select>
+</div>
+<p class="mt-1 text-xs text-gray-500">Choose the verified center where you intend to donate.</p>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-2" for="quantity">Quantity (ml)</label>
+<div class="relative rounded-md shadow-sm">
+<input class="focus:ring-[var(--primary-red)] focus:border-[var(--primary-red)] block w-full pl-4 pr-12 py-3 sm:text-sm border-gray-300 rounded-lg" id="quantity" name="quantity" placeholder="450" type="number" value="450"/>
+<div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+<span class="text-gray-500 sm:text-sm">ml</span>
+</div>
+</div>
+<p class="mt-1 text-xs text-gray-500">Standard donation is usually 450ml.</p>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 mb-2" for="type">Donation Type</label>
+<select class="block w-full pl-3 pr-10 py-3 text-base border-gray-300 focus:outline-none focus:ring-[var(--primary-red)] focus:border-[var(--primary-red)] sm:text-sm rounded-lg shadow-sm" id="type" name="type">
+<option>Whole Blood</option>
+<option>Platelets</option>
+<option>Plasma</option>
+</select>
+</div>
+<div class="col-span-2 md:col-span-1">
+<label class="block text-sm font-medium text-gray-700 mb-2" for="date">Preferred Date</label>
+<input class="focus:ring-[var(--primary-red)] focus:border-[var(--primary-red)] block w-full pl-3 pr-3 py-3 sm:text-sm border-gray-300 rounded-lg shadow-sm" id="date" name="date" type="date"/>
+</div>
+<div class="col-span-2 md:col-span-1">
+<label class="block text-sm font-medium text-gray-700 mb-2" for="time">Preferred Time</label>
+<select class="block w-full pl-3 pr-10 py-3 text-base border-gray-300 focus:outline-none focus:ring-[var(--primary-red)] focus:border-[var(--primary-red)] sm:text-sm rounded-lg shadow-sm" id="time" name="time">
+<option>08:00 AM - 10:00 AM</option>
+<option>10:00 AM - 12:00 PM</option>
+<option>12:00 PM - 02:00 PM</option>
+<option>02:00 PM - 04:00 PM</option>
+</select>
+</div>
+<div class="col-span-2">
+<label class="block text-sm font-medium text-gray-700 mb-2" for="notes">Additional Notes</label>
+<div class="mt-1">
+<textarea class="shadow-sm focus:ring-[var(--primary-red)] focus:border-[var(--primary-red)] block w-full sm:text-sm border border-gray-300 rounded-lg p-3" id="notes" name="notes" placeholder="Any specific requirements, medical conditions recently changed, or questions?" rows="4"></textarea>
+</div>
+</div>
+</div>
+<div class="pt-6 border-t border-gray-100 flex items-center justify-end gap-4">
+<button class="bg-white py-3 px-6 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--primary-red)] transition-colors" type="button">
+                                Cancel
+                            </button>
+<button class="inline-flex justify-center py-3 px-6 border border-transparent shadow-md text-sm font-medium rounded-lg text-white bg-[var(--primary-red)] hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--primary-red)] transition-all transform hover:-translate-y-0.5" type="submit">
+                                Submit Declaration
+                            </button>
+</div>
+</form>
+</div>
+</div>
+</div>
+</main>
+<footer class="bg-white border-t border-gray-200 mt-12">
+<div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+<p class="text-center text-sm text-gray-400">© 2023 LifeBlood Inc. All rights reserved.</p>
+</div>
+</footer>
+
+</body></html>
+
+<!-- directions.txt -->
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Inventory &amp; Stock Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        :root {
+            --primary-color: #EF4444;--primary-dark: #DC2626;--secondary-color: #64748B;--bg-color: #F3F4F6;--card-bg: #FFFFFF;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+        }
+        .status-critical {
+            @apply bg-red-100 text-red-700 border border-red-200;
+        }
+        .status-low {
+            @apply bg-orange-100 text-orange-700 border border-orange-200;
+        }
+        .status-normal {
+            @apply bg-emerald-100 text-emerald-700 border border-emerald-200;
+        }
+        .nav-item {
+            @apply flex items-center px-4 py-3 text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors duration-200 cursor-pointer;
+        }
+        .nav-item.active {
+            @apply bg-red-50 text-red-600 font-medium;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col md:flex-row">
+<aside class="w-full md:w-64 bg-white border-r border-gray-200 flex flex-col fixed h-full z-10 hidden md:flex">
+<div class="p-6 border-b border-gray-100">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+<span class="material-symbols-outlined">water_drop</span>
+</div>
+<div>
+<h1 class="text-lg font-bold text-gray-900">BloodBank</h1>
+<p class="text-xs text-gray-500">Admin Portal</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+<a class="nav-item" href="#">
+<span class="material-symbols-outlined mr-3">dashboard</span>
+                Dashboard
+            </a>
+<a class="nav-item" href="#">
+<span class="material-symbols-outlined mr-3">volunteer_activism</span>
+                Donations
+            </a>
+<a class="nav-item" href="#">
+<span class="material-symbols-outlined mr-3">clinical_notes</span>
+                Demands
+            </a>
+<a class="nav-item active" href="#">
+<span class="material-symbols-outlined mr-3">inventory_2</span>
+                Inventory &amp; Stock
+            </a>
+<a class="nav-item" href="#">
+<span class="material-symbols-outlined mr-3">group</span>
+                Donors
+            </a>
+<a class="nav-item" href="#">
+<span class="material-symbols-outlined mr-3">campaign</span>
+                Campaigns
+            </a>
+<a class="nav-item" href="#">
+<span class="material-symbols-outlined mr-3">analytics</span>
+                Reports
+            </a>
+</nav>
+<div class="p-4 border-t border-gray-100">
+<div class="flex items-center gap-3 px-2 py-2">
+<img alt="Admin" class="w-8 h-8 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD5NfUAxsbQKkhQmgJs_95-FZNmHtXw30yIU5VrKXxXmSOVgC5CHgfzcdqeOsJWHXDzyjyD3C4sRlYk9TtNFpJsHfufp-_oY2KjZWFzbXgZVFhMWM2BljYKyM5CYiKjoZXdGwZrld5dDfljQWfTWz_jhY1OawAJmZyCh0M6_8Pj2tEmLcFin_i3r1sTJDxykecAQC6hC89cBO_zSvZdd1cn8BlQjkbY_md1vEQXTufsjuh7a8iu4McLt9DcHiob4cl1KeAGLAs-AdM"/>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-medium text-gray-900 truncate">Dr. Sarah Smith</p>
+<p class="text-xs text-gray-500 truncate">City General Hospital</p>
+</div>
+<button class="text-gray-400 hover:text-red-500">
+<span class="material-symbols-outlined">logout</span>
+</button>
+</div>
+</div>
+</aside>
+<main class="flex-1 md:ml-64 p-4 md:p-8">
+<header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div>
+<h2 class="text-2xl font-bold text-gray-900">Inventory &amp; Stock Management</h2>
+<p class="text-gray-500 mt-1">Manage blood bank inventory levels, monitor critical shortages, and analyze trends.</p>
+</div>
+<div class="flex gap-3">
+<button class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors shadow-sm font-medium text-sm">
+<span class="material-symbols-outlined text-[20px]">file_download</span>
+                    Export Report
+                </button>
+<button class="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-sm font-medium text-sm">
+<span class="material-symbols-outlined text-[20px]">add_circle</span>
+                    Adjust Stock
+                </button>
+</div>
+</header>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+<div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+<div class="flex justify-between items-start">
+<div>
+<p class="text-sm font-medium text-gray-500">Total Inventory</p>
+<h3 class="text-2xl font-bold text-gray-900 mt-1">1,240 <span class="text-sm font-normal text-gray-500">Units</span></h3>
+</div>
+<div class="p-2 bg-blue-50 rounded-lg text-blue-600">
+<span class="material-symbols-outlined">bloodtype</span>
+</div>
+</div>
+<div class="mt-4 flex items-center text-sm">
+<span class="text-emerald-600 font-medium flex items-center">
+<span class="material-symbols-outlined text-[16px] mr-1">trending_up</span>
+                        +5.2%
+                    </span>
+<span class="text-gray-400 ml-2">from last month</span>
+</div>
+</div>
+<div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+<div class="flex justify-between items-start">
+<div>
+<p class="text-sm font-medium text-gray-500">Critical Types</p>
+<h3 class="text-2xl font-bold text-gray-900 mt-1">2 <span class="text-sm font-normal text-gray-500">Groups</span></h3>
+</div>
+<div class="p-2 bg-red-50 rounded-lg text-red-600">
+<span class="material-symbols-outlined">warning</span>
+</div>
+</div>
+<div class="mt-4 flex items-center text-sm">
+<span class="text-red-600 font-medium">Action Required</span>
+<span class="text-gray-400 ml-2">O-, AB-</span>
+</div>
+</div>
+<div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+<div class="flex justify-between items-start">
+<div>
+<p class="text-sm font-medium text-gray-500">Total Capacity</p>
+<h3 class="text-2xl font-bold text-gray-900 mt-1">68% <span class="text-sm font-normal text-gray-500">Utilized</span></h3>
+</div>
+<div class="p-2 bg-purple-50 rounded-lg text-purple-600">
+<span class="material-symbols-outlined">warehouse</span>
+</div>
+</div>
+<div class="w-full bg-gray-200 rounded-full h-1.5 mt-4">
+<div class="bg-purple-600 h-1.5 rounded-full" style="width: 68%"></div>
+</div>
+</div>
+<div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+<div class="flex justify-between items-start">
+<div>
+<p class="text-sm font-medium text-gray-500">Expiring Soon</p>
+<h3 class="text-2xl font-bold text-gray-900 mt-1">15 <span class="text-sm font-normal text-gray-500">Units</span></h3>
+</div>
+<div class="p-2 bg-orange-50 rounded-lg text-orange-600">
+<span class="material-symbols-outlined">event_busy</span>
+</div>
+</div>
+<div class="mt-4 flex items-center text-sm">
+<span class="text-orange-600 font-medium">Within 48h</span>
+<span class="text-gray-400 ml-2">Review stock</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<div class="lg:col-span-2 space-y-6">
+<div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+<div class="relative w-full sm:w-64">
+<span class="material-symbols-outlined absolute left-3 top-2.5 text-gray-400">search</span>
+<input class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm" placeholder="Search blood group..." type="text"/>
+</div>
+<div class="flex items-center gap-4">
+<label class="inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+<span class="ms-3 text-sm font-medium text-gray-700">Filter by Critical</span>
+</label>
+</div>
+</div>
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-gray-50 text-gray-500 text-xs uppercase font-semibold border-b border-gray-200">
+<th class="px-6 py-4">Blood Group</th>
+<th class="px-6 py-4">Quantity (Units/Liters)</th>
+<th class="px-6 py-4">Capacity %</th>
+<th class="px-6 py-4">Last Updated</th>
+<th class="px-6 py-4 text-center">Status</th>
+<th class="px-6 py-4 text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-gray-100 text-sm">
+<tr class="hover:bg-gray-50 group transition-colors">
+<td class="px-6 py-4 font-medium text-gray-900 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-red-100 text-red-700 flex items-center justify-center font-bold text-xs">O-</div>
+<span>O Negative</span>
+</td>
+<td class="px-6 py-4 text-gray-700">
+<div class="font-medium">12 Units</div>
+<div class="text-xs text-gray-400">5.4 Liters</div>
+</td>
+<td class="px-6 py-4">
+<div class="w-full bg-gray-200 rounded-full h-2 w-24">
+<div class="bg-red-500 h-2 rounded-full" style="width: 15%"></div>
+</div>
+<span class="text-xs text-gray-500 mt-1 inline-block">15%</span>
+</td>
+<td class="px-6 py-4 text-gray-500">
+                                        10 mins ago
+                                    </td>
+<td class="px-6 py-4 text-center">
+<span class="status-critical px-2.5 py-0.5 rounded-full text-xs font-medium inline-flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
+                                            Critical
+                                        </span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-gray-400 hover:text-red-600 transition-colors">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-gray-50 group transition-colors">
+<td class="px-6 py-4 font-medium text-gray-900 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-red-100 text-red-700 flex items-center justify-center font-bold text-xs">AB-</div>
+<span>AB Negative</span>
+</td>
+<td class="px-6 py-4 text-gray-700">
+<div class="font-medium">8 Units</div>
+<div class="text-xs text-gray-400">3.6 Liters</div>
+</td>
+<td class="px-6 py-4">
+<div class="w-full bg-gray-200 rounded-full h-2 w-24">
+<div class="bg-red-500 h-2 rounded-full" style="width: 10%"></div>
+</div>
+<span class="text-xs text-gray-500 mt-1 inline-block">10%</span>
+</td>
+<td class="px-6 py-4 text-gray-500">
+                                        1 hour ago
+                                    </td>
+<td class="px-6 py-4 text-center">
+<span class="status-critical px-2.5 py-0.5 rounded-full text-xs font-medium inline-flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
+                                            Critical
+                                        </span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-gray-400 hover:text-red-600 transition-colors">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-gray-50 group transition-colors">
+<td class="px-6 py-4 font-medium text-gray-900 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center font-bold text-xs">A-</div>
+<span>A Negative</span>
+</td>
+<td class="px-6 py-4 text-gray-700">
+<div class="font-medium">25 Units</div>
+<div class="text-xs text-gray-400">11.25 Liters</div>
+</td>
+<td class="px-6 py-4">
+<div class="w-full bg-gray-200 rounded-full h-2 w-24">
+<div class="bg-orange-500 h-2 rounded-full" style="width: 32%"></div>
+</div>
+<span class="text-xs text-gray-500 mt-1 inline-block">32%</span>
+</td>
+<td class="px-6 py-4 text-gray-500">
+                                        2 hours ago
+                                    </td>
+<td class="px-6 py-4 text-center">
+<span class="status-low px-2.5 py-0.5 rounded-full text-xs font-medium">Low</span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-gray-400 hover:text-red-600 transition-colors">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-gray-50 group transition-colors">
+<td class="px-6 py-4 font-medium text-gray-900 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center font-bold text-xs">A+</div>
+<span>A Positive</span>
+</td>
+<td class="px-6 py-4 text-gray-700">
+<div class="font-medium">145 Units</div>
+<div class="text-xs text-gray-400">65.25 Liters</div>
+</td>
+<td class="px-6 py-4">
+<div class="w-full bg-gray-200 rounded-full h-2 w-24">
+<div class="bg-emerald-500 h-2 rounded-full" style="width: 78%"></div>
+</div>
+<span class="text-xs text-gray-500 mt-1 inline-block">78%</span>
+</td>
+<td class="px-6 py-4 text-gray-500">
+                                        5 mins ago
+                                    </td>
+<td class="px-6 py-4 text-center">
+<span class="status-normal px-2.5 py-0.5 rounded-full text-xs font-medium">Normal</span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-gray-400 hover:text-red-600 transition-colors">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-gray-50 group transition-colors">
+<td class="px-6 py-4 font-medium text-gray-900 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center font-bold text-xs">B+</div>
+<span>B Positive</span>
+</td>
+<td class="px-6 py-4 text-gray-700">
+<div class="font-medium">110 Units</div>
+<div class="text-xs text-gray-400">49.5 Liters</div>
+</td>
+<td class="px-6 py-4">
+<div class="w-full bg-gray-200 rounded-full h-2 w-24">
+<div class="bg-emerald-500 h-2 rounded-full" style="width: 65%"></div>
+</div>
+<span class="text-xs text-gray-500 mt-1 inline-block">65%</span>
+</td>
+<td class="px-6 py-4 text-gray-500">
+                                        45 mins ago
+                                    </td>
+<td class="px-6 py-4 text-center">
+<span class="status-normal px-2.5 py-0.5 rounded-full text-xs font-medium">Normal</span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-gray-400 hover:text-red-600 transition-colors">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-gray-50 group transition-colors">
+<td class="px-6 py-4 font-medium text-gray-900 flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center font-bold text-xs">O+</div>
+<span>O Positive</span>
+</td>
+<td class="px-6 py-4 text-gray-700">
+<div class="font-medium">42 Units</div>
+<div class="text-xs text-gray-400">18.9 Liters</div>
+</td>
+<td class="px-6 py-4">
+<div class="w-full bg-gray-200 rounded-full h-2 w-24">
+<div class="bg-orange-500 h-2 rounded-full" style="width: 40%"></div>
+</div>
+<span class="text-xs text-gray-500 mt-1 inline-block">40%</span>
+</td>
+<td class="px-6 py-4 text-gray-500">
+                                        1 day ago
+                                    </td>
+<td class="px-6 py-4 text-center">
+<span class="status-low px-2.5 py-0.5 rounded-full text-xs font-medium">Low</span>
+</td>
+<td class="px-6 py-4 text-right">
+<button class="text-gray-400 hover:text-red-600 transition-colors">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+<span class="text-xs text-gray-500">Showing 1 to 6 of 8 entries</span>
+<div class="flex gap-1">
+<button class="px-3 py-1 border border-gray-200 rounded hover:bg-gray-50 text-xs text-gray-600">Previous</button>
+<button class="px-3 py-1 bg-red-50 border border-red-100 rounded text-xs text-red-600 font-medium">1</button>
+<button class="px-3 py-1 border border-gray-200 rounded hover:bg-gray-50 text-xs text-gray-600">2</button>
+<button class="px-3 py-1 border border-gray-200 rounded hover:bg-gray-50 text-xs text-gray-600">Next</button>
+</div>
+</div>
+</div>
+</div>
+<div class="space-y-6">
+<div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-semibold text-gray-900">Stock Trends (30 Days)</h3>
+<button class="text-gray-400 hover:text-gray-600">
+<span class="material-symbols-outlined text-[20px]">more_horiz</span>
+</button>
+</div>
+<div class="relative h-64 w-full">
+<div class="flex items-end justify-between h-48 gap-2 px-2">
+<div class="w-full bg-gray-100 rounded-t hover:bg-red-100 transition-colors relative group" style="height: 40%">
+<div class="opacity-0 group-hover:opacity-100 absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded pointer-events-none whitespace-nowrap z-10">Day 1: 400L</div>
+</div>
+<div class="w-full bg-gray-100 rounded-t hover:bg-red-100 transition-colors" style="height: 55%"></div>
+<div class="w-full bg-gray-100 rounded-t hover:bg-red-100 transition-colors" style="height: 45%"></div>
+<div class="w-full bg-gray-100 rounded-t hover:bg-red-100 transition-colors" style="height: 60%"></div>
+<div class="w-full bg-gray-100 rounded-t hover:bg-red-100 transition-colors" style="height: 75%"></div>
+<div class="w-full bg-red-100 rounded-t hover:bg-red-200 transition-colors" style="height: 30%"></div> 
+<div class="w-full bg-gray-100 rounded-t hover:bg-red-100 transition-colors" style="height: 50%"></div>
+<div class="w-full bg-gray-100 rounded-t hover:bg-red-100 transition-colors" style="height: 65%"></div>
+<div class="w-full bg-gray-100 rounded-t hover:bg-red-100 transition-colors" style="height: 80%"></div>
+<div class="w-full bg-gray-100 rounded-t hover:bg-red-100 transition-colors" style="height: 70%"></div>
+<div class="w-full bg-gray-100 rounded-t hover:bg-red-100 transition-colors" style="height: 55%"></div>
+<div class="w-full bg-gray-100 rounded-t hover:bg-red-100 transition-colors" style="height: 45%"></div>
+</div>
+<div class="flex justify-between mt-2 text-xs text-gray-400 px-2">
+<span>Week 1</span>
+<span>Week 2</span>
+<span>Week 3</span>
+<span>Week 4</span>
+</div>
+<svg class="absolute top-0 left-0 w-full h-48 pointer-events-none" preserveAspectRatio="none">
+<path class="drop-shadow-md" d="M0 115 C 20 100, 40 80, 60 90 S 100 60, 140 130 S 180 90, 220 70 S 260 50, 300 60 S 340 90, 380 110" fill="none" stroke="#EF4444" stroke-linecap="round" stroke-width="2"></path>
+<circle cx="140" cy="130" fill="#EF4444" r="4" stroke="white" stroke-width="2"></circle>
+</svg>
+</div>
+<div class="flex items-center gap-4 mt-4 pt-4 border-t border-gray-100">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-red-500"></span>
+<span class="text-xs text-gray-500">In Stock</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-full bg-gray-300"></span>
+<span class="text-xs text-gray-500">Usage</span>
+</div>
+</div>
+</div>
+<div class="bg-red-50 border border-red-100 p-5 rounded-xl">
+<h3 class="font-semibold text-red-800 flex items-center gap-2 mb-3">
+<span class="material-symbols-outlined text-[20px]">notifications_active</span>
+                        Stock Alerts
+                    </h3>
+<div class="space-y-3">
+<div class="bg-white p-3 rounded-lg border border-red-100 shadow-sm flex gap-3">
+<div class="shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-red-500 text-[18px]">error</span>
+</div>
+<div>
+<p class="text-sm font-medium text-gray-800">Critical Shortage: O-</p>
+<p class="text-xs text-gray-500 mt-0.5">Stock dropped below 15%. Initiate urgent campaign.</p>
+<button class="mt-2 text-xs font-medium text-red-600 hover:text-red-700 underline">Start Campaign</button>
+</div>
+</div>
+<div class="bg-white p-3 rounded-lg border border-red-100 shadow-sm flex gap-3">
+<div class="shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-orange-500 text-[18px]">warning</span>
+</div>
+<div>
+<p class="text-sm font-medium text-gray-800">Low Stock: A-</p>
+<p class="text-xs text-gray-500 mt-0.5">Currently at 32%. Monitor closely.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+<h3 class="font-semibold text-gray-900 mb-4">Quick Actions</h3>
+<div class="space-y-2">
+<button class="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm text-gray-700 font-medium flex items-center justify-between transition-colors">
+<span>Request Supply Transfer</span>
+<span class="material-symbols-outlined text-gray-400 text-[18px]">arrow_forward</span>
+</button>
+<button class="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm text-gray-700 font-medium flex items-center justify-between transition-colors">
+<span>Generate Compliance Report</span>
+<span class="material-symbols-outlined text-gray-400 text-[18px]">arrow_forward</span>
+</button>
+<button class="w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm text-gray-700 font-medium flex items-center justify-between transition-colors">
+<span>Contact Top Donors (O-)</span>
+<span class="material-symbols-outlined text-gray-400 text-[18px]">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+</body></html>
+
+<!-- directions.txt -->
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Blood Requests Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        :root {
+            --primary-color: #EF4444;--secondary-color: #3B82F6;--background-color: #F3F4F6;
+            --surface-color: #FFFFFF;
+            --text-primary: #1F2937;
+            --text-secondary: #6B7280;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+<aside class="w-64 bg-white border-r border-gray-200 flex-shrink-0 flex flex-col justify-between hidden md:flex">
+<div>
+<div class="h-16 flex items-center px-6 border-b border-gray-100">
+<div class="flex items-center gap-2 text-[var(--primary-color)] font-bold text-xl">
+<span class="material-symbols-outlined text-3xl">bloodtype</span>
+<span>BloodBank</span>
+</div>
+</div>
+<nav class="p-4 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-red-50 hover:text-[var(--primary-color)] rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-medium">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-red-50 hover:text-[var(--primary-color)] rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">favorite</span>
+<span class="font-medium">Donations</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-red-50 text-[var(--primary-color)] rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">local_hospital</span>
+<span class="font-medium">Requests</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-red-50 hover:text-[var(--primary-color)] rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-medium">Stock</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-red-50 hover:text-[var(--primary-color)] rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-medium">Donors</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-red-50 hover:text-[var(--primary-color)] rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">campaign</span>
+<span class="font-medium">Campaigns</span>
+</a>
+</nav>
+</div>
+<div class="p-4 border-t border-gray-100">
+<div class="flex items-center gap-3 px-4 py-3">
+<div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+<span class="material-symbols-outlined">person</span>
+</div>
+<div>
+<p class="text-sm font-medium text-gray-900">Dr. Sarah Smith</p>
+<p class="text-xs text-gray-500">Admin</p>
+</div>
+</div>
+<button class="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+<span class="material-symbols-outlined text-lg">logout</span>
+                Logout
+            </button>
+</div>
+</aside>
+<main class="flex-1 flex flex-col overflow-hidden relative">
+<header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 flex-shrink-0 z-10">
+<h1 class="text-2xl font-bold text-gray-800">Blood Requests Management</h1>
+<div class="flex items-center gap-4">
+<button class="p-2 text-gray-400 hover:text-gray-600 relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+</button>
+<button class="p-2 text-gray-400 hover:text-gray-600">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+</header>
+<div class="flex-1 overflow-y-auto p-8">
+<div class="mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
+<div class="w-full md:w-1/2 relative">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 material-symbols-outlined">search</span>
+<input class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 focus:border-[var(--secondary-color)] focus:ring-[var(--secondary-color)] transition-all outline-none" placeholder="Search by patient name or blood group..." type="text"/>
+</div>
+<div class="flex gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+<button class="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-900 transition-colors whitespace-nowrap">
+<span class="material-symbols-outlined text-lg">filter_list</span>
+                        All Status
+                    </button>
+<button class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors whitespace-nowrap">
+<span class="material-symbols-outlined text-lg">calendar_today</span>
+                        Date
+                    </button>
+<button class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors whitespace-nowrap">
+<span class="material-symbols-outlined text-lg">medical_services</span>
+                        Urgency
+                    </button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+<div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+<div>
+<p class="text-sm text-gray-500 font-medium">Pending Requests</p>
+<p class="text-2xl font-bold text-gray-900 mt-1">24</p>
+</div>
+<div class="w-10 h-10 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center">
+<span class="material-symbols-outlined">hourglass_empty</span>
+</div>
+</div>
+<div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+<div>
+<p class="text-sm text-gray-500 font-medium">Critical Urgency</p>
+<p class="text-2xl font-bold text-red-600 mt-1">5</p>
+</div>
+<div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
+<span class="material-symbols-outlined">warning</span>
+</div>
+</div>
+<div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+<div>
+<p class="text-sm text-gray-500 font-medium">Processing</p>
+<p class="text-2xl font-bold text-blue-600 mt-1">12</p>
+</div>
+<div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+<span class="material-symbols-outlined">cached</span>
+</div>
+</div>
+<div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+<div>
+<p class="text-sm text-gray-500 font-medium">Satisfied Today</p>
+<p class="text-2xl font-bold text-green-600 mt-1">8</p>
+</div>
+<div class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+<span class="material-symbols-outlined">check_circle</span>
+</div>
+</div>
+</div>
+<h2 class="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+                Pending Demands
+                <span class="bg-gray-200 text-gray-700 text-xs px-2 py-0.5 rounded-full">24</span>
+</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<div class="bg-white rounded-xl shadow-sm border border-l-4 border-l-red-500 border-gray-200 p-5 hover:shadow-md transition-shadow relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-4 opacity-10">
+<span class="material-symbols-outlined text-6xl">bloodtype</span>
+</div>
+<div class="flex justify-between items-start mb-4 relative z-10">
+<div class="flex gap-3 items-center">
+<div class="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center font-bold text-lg border border-red-100">
+                                O+
+                            </div>
+<div>
+<h3 class="font-bold text-gray-900">James Anderson</h3>
+<p class="text-xs text-gray-500">ID: #REQ-2023-894</p>
+</div>
+</div>
+<span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700 animate-pulse">
+                            CRITICAL
+                        </span>
+</div>
+<div class="space-y-3 mb-6 relative z-10">
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">apartment</span>
+<span class="font-medium">Emergency Dept. (ER)</span>
+</div>
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">calendar_month</span>
+<span>Oct 24, 2023 • 10:45 AM</span>
+</div>
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">water_drop</span>
+<span>3 Units (1350ml) required</span>
+</div>
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">medical_information</span>
+<span class="italic text-gray-500">Severe Trauma, Hemorrhage</span>
+</div>
+</div>
+<div class="flex gap-2 relative z-10 pt-2 border-t border-gray-100 mt-2">
+<button class="flex-1 py-2 px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-sm">check</span> Satisfy
+                        </button>
+<button class="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-sm">pending</span> In Progress
+                        </button>
+<button class="p-2 text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition-colors flex items-center justify-center" title="Reject">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+</div>
+<div class="bg-white rounded-xl shadow-sm border border-l-4 border-l-orange-500 border-gray-200 p-5 hover:shadow-md transition-shadow relative overflow-hidden">
+<div class="flex justify-between items-start mb-4 relative z-10">
+<div class="flex gap-3 items-center">
+<div class="w-12 h-12 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center font-bold text-lg border border-orange-100">
+                                A-
+                            </div>
+<div>
+<h3 class="font-bold text-gray-900">Maria Garcia</h3>
+<p class="text-xs text-gray-500">ID: #REQ-2023-892</p>
+</div>
+</div>
+<span class="px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
+                            HIGH
+                        </span>
+</div>
+<div class="space-y-3 mb-6 relative z-10">
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">apartment</span>
+<span class="font-medium">Surgery Dept.</span>
+</div>
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">calendar_month</span>
+<span>Oct 24, 2023 • 09:15 AM</span>
+</div>
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">water_drop</span>
+<span>2 Units (900ml) required</span>
+</div>
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">medical_information</span>
+<span class="italic text-gray-500">Cardiac Surgery Prep</span>
+</div>
+</div>
+<div class="flex gap-2 relative z-10 pt-2 border-t border-gray-100 mt-2">
+<button class="flex-1 py-2 px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-sm">check</span> Satisfy
+                        </button>
+<button class="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-sm">pending</span> In Progress
+                        </button>
+<button class="p-2 text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition-colors flex items-center justify-center" title="Reject">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+</div>
+<div class="bg-white rounded-xl shadow-sm border border-l-4 border-l-blue-500 border-gray-200 p-5 hover:shadow-md transition-shadow relative overflow-hidden">
+<div class="flex justify-between items-start mb-4 relative z-10">
+<div class="flex gap-3 items-center">
+<div class="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg border border-blue-100">
+                                AB+
+                            </div>
+<div>
+<h3 class="font-bold text-gray-900">Robert Chen</h3>
+<p class="text-xs text-gray-500">ID: #REQ-2023-889</p>
+</div>
+</div>
+<span class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                            NORMAL
+                        </span>
+</div>
+<div class="space-y-3 mb-6 relative z-10">
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">apartment</span>
+<span class="font-medium">Oncology Dept.</span>
+</div>
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">calendar_month</span>
+<span>Oct 23, 2023 • 04:30 PM</span>
+</div>
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">water_drop</span>
+<span>1 Unit (450ml) required</span>
+</div>
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">medical_information</span>
+<span class="italic text-gray-500">Scheduled Transfusion</span>
+</div>
+</div>
+<div class="flex gap-2 relative z-10 pt-2 border-t border-gray-100 mt-2">
+<button class="flex-1 py-2 px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-sm">check</span> Satisfy
+                        </button>
+<button class="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-sm">pending</span> In Progress
+                        </button>
+<button class="p-2 text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition-colors flex items-center justify-center" title="Reject">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+</div>
+<div class="bg-white rounded-xl shadow-sm border border-l-4 border-l-blue-500 border-gray-200 p-5 hover:shadow-md transition-shadow relative overflow-hidden">
+<div class="flex justify-between items-start mb-4 relative z-10">
+<div class="flex gap-3 items-center">
+<div class="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg border border-blue-100">
+                                B+
+                            </div>
+<div>
+<h3 class="font-bold text-gray-900">Linda Johnson</h3>
+<p class="text-xs text-gray-500">ID: #REQ-2023-885</p>
+</div>
+</div>
+<span class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                            NORMAL
+                        </span>
+</div>
+<div class="space-y-3 mb-6 relative z-10">
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">apartment</span>
+<span class="font-medium">Maternity Ward</span>
+</div>
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">calendar_month</span>
+<span>Oct 23, 2023 • 02:10 PM</span>
+</div>
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">water_drop</span>
+<span>2 Units (900ml) required</span>
+</div>
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">medical_information</span>
+<span class="italic text-gray-500">Post-partum Observation</span>
+</div>
+</div>
+<div class="flex gap-2 relative z-10 pt-2 border-t border-gray-100 mt-2">
+<button class="flex-1 py-2 px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-sm">check</span> Satisfy
+                        </button>
+<button class="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-sm">pending</span> In Progress
+                        </button>
+<button class="p-2 text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition-colors flex items-center justify-center" title="Reject">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+</div>
+<div class="bg-white rounded-xl shadow-sm border border-l-4 border-l-orange-500 border-gray-200 p-5 hover:shadow-md transition-shadow relative overflow-hidden">
+<div class="flex justify-between items-start mb-4 relative z-10">
+<div class="flex gap-3 items-center">
+<div class="w-12 h-12 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center font-bold text-lg border border-orange-100">
+                                O-
+                            </div>
+<div>
+<h3 class="font-bold text-gray-900">David Kim</h3>
+<p class="text-xs text-gray-500">ID: #REQ-2023-881</p>
+</div>
+</div>
+<span class="px-3 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
+                            HIGH
+                        </span>
+</div>
+<div class="space-y-3 mb-6 relative z-10">
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">apartment</span>
+<span class="font-medium">ICU</span>
+</div>
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">calendar_month</span>
+<span>Oct 23, 2023 • 11:55 AM</span>
+</div>
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">water_drop</span>
+<span>4 Units (1800ml) required</span>
+</div>
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">medical_information</span>
+<span class="italic text-gray-500">Internal Bleeding</span>
+</div>
+</div>
+<div class="flex gap-2 relative z-10 pt-2 border-t border-gray-100 mt-2">
+<button class="flex-1 py-2 px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-sm">check</span> Satisfy
+                        </button>
+<button class="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-sm">pending</span> In Progress
+                        </button>
+<button class="p-2 text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition-colors flex items-center justify-center" title="Reject">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+</div>
+<div class="bg-white rounded-xl shadow-sm border border-l-4 border-l-red-500 border-gray-200 p-5 hover:shadow-md transition-shadow relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-4 opacity-10">
+<span class="material-symbols-outlined text-6xl">bloodtype</span>
+</div>
+<div class="flex justify-between items-start mb-4 relative z-10">
+<div class="flex gap-3 items-center">
+<div class="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center font-bold text-lg border border-red-100">
+                                AB-
+                            </div>
+<div>
+<h3 class="font-bold text-gray-900">Susan Miller</h3>
+<p class="text-xs text-gray-500">ID: #REQ-2023-878</p>
+</div>
+</div>
+<span class="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700 animate-pulse">
+                            CRITICAL
+                        </span>
+</div>
+<div class="space-y-3 mb-6 relative z-10">
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">apartment</span>
+<span class="font-medium">Neonatal ICU</span>
+</div>
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">calendar_month</span>
+<span>Oct 23, 2023 • 09:30 AM</span>
+</div>
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">water_drop</span>
+<span>1 Unit (350ml) required</span>
+</div>
+<div class="flex items-center gap-3 text-sm text-gray-600">
+<span class="material-symbols-outlined text-gray-400 text-lg">medical_information</span>
+<span class="italic text-gray-500">Emergency Transfusion</span>
+</div>
+</div>
+<div class="flex gap-2 relative z-10 pt-2 border-t border-gray-100 mt-2">
+<button class="flex-1 py-2 px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-sm">check</span> Satisfy
+                        </button>
+<button class="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-sm">pending</span> In Progress
+                        </button>
+<button class="p-2 text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition-colors flex items-center justify-center" title="Reject">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+</body></html>
