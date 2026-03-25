@@ -1,0 +1,36 @@
+<aside class="w-[260px] shrink-0 bg-white border-r border-gray-200 flex flex-col">
+  <div class="p-4 flex items-center gap-2">
+    <span class="material-symbols-outlined text-primary-red text-2xl" style="font-variation-settings: 'FILL' 1">bloodtype</span>
+    <span class="font-semibold text-red-600 text-lg">LifeFlow</span>
+  </div>
+  <nav class="flex-1 px-3 py-2 space-y-0.5">
+    @for (item of navItems(); track item.path) {
+      <a
+        [routerLink]="item.path"
+        routerLinkActive="bg-red-50 text-red-600"
+        [routerLinkActiveOptions]="{ exact: item.path.includes('dashboard') || item.path === '/donneur/profil' }"
+        class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+      >
+        <span class="material-symbols-outlined text-xl">{{ item.icon }}</span>
+        <span>{{ item.label }}</span>
+      </a>
+    }
+  </nav>
+  <div class="p-4 border-t border-gray-200 space-y-1">
+    @if (authService.getCurrentUser(); as user) {
+      <p class="text-xs text-gray-500 truncate">{{ user.nom }} {{ user.prenom }}</p>
+      <p class="text-xs text-gray-400">{{ user.role }}</p>
+      @if (user.role === 'USER' && user.pointsTotal != null) {
+        <p class="text-xs text-red-600 font-medium">{{ user.pointsTotal }} pts</p>
+      }
+    }
+    <button
+      type="button"
+      (click)="authService.logout()"
+      class="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+    >
+      <span class="material-symbols-outlined text-xl">logout</span>
+      <span>Déconnexion</span>
+    </button>
+  </div>
+</aside>

@@ -1,0 +1,944 @@
+{
+	"info": {
+		"_postman_id": "bks-blood-bank-system",
+		"name": "Blood Bank System API",
+		"description": "Collection complete pour tester l'API Blood Bank System (BKS)\n\n## Instructions:\n1. Demarrer l'application Spring Boot\n2. Tester d'abord l'endpoint public /api/public/health\n3. Executer les requetes d'authentification\n4. Le token sera automatiquement stocke dans les variables\n5. Tester les autres endpoints\n\n## Ordre de test:\n1. Public > Health Check\n2. Auth > Inscription Super Admin\n3. Super Admin > Creer Hopital\n4. Super Admin > Valider Hopital\n5. Auth > Inscription Admin\n6. Auth > Inscription Donneur\n7. Auth > Connexion (pour changer de compte)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080/api"
+		},
+		{
+			"key": "token",
+			"value": ""
+		},
+		{
+			"key": "hopitalId",
+			"value": "1"
+		},
+		{
+			"key": "userId",
+			"value": "1"
+		},
+		{
+			"key": "donId",
+			"value": "1"
+		},
+		{
+			"key": "demandeId",
+			"value": "1"
+		}
+	],
+	"item": [
+		{
+			"name": "0. Public (Sans Auth)",
+			"item": [
+				{
+					"name": "Health Check",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('API is running', function() {",
+									"    pm.response.to.have.status(200);",
+									"    var json = pm.response.json();",
+									"    pm.expect(json.status).to.eql('UP');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/public/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["public", "health"]
+						},
+						"description": "Verifier que l'API fonctionne (AUCUNE AUTH REQUISE)"
+					}
+				},
+				{
+					"name": "Test Public",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/public/test",
+							"host": ["{{baseUrl}}"],
+							"path": ["public", "test"]
+						},
+						"description": "Endpoint de test public"
+					}
+				}
+			]
+		},
+		{
+			"name": "1. Authentification",
+			"item": [
+				{
+					"name": "Inscription - Super Admin",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Inscription reussie', function() {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"if (pm.response.code === 201) {",
+									"    var json = pm.response.json();",
+									"    pm.collectionVariables.set('token', json.token);",
+									"    pm.collectionVariables.set('userId', json.id);",
+									"    console.log('Token saved: ' + json.token.substring(0, 50) + '...');",
+									"    console.log('User ID: ' + json.id);",
+									"    console.log('Role: ' + json.role);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"superadmin@bks.com\",\n    \"motDePasse\": \"admin123\",\n    \"nom\": \"Admin\",\n    \"prenom\": \"Super\",\n    \"telephone\": \"0600000000\",\n    \"role\": \"SUPER_ADMIN\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/inscription",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "inscription"]
+						},
+						"description": "Creer le premier compte Super Admin - AUCUNE AUTH REQUISE"
+					}
+				},
+				{
+					"name": "Inscription - Admin Hopital",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Inscription Admin reussie', function() {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"if (pm.response.code === 201) {",
+									"    var json = pm.response.json();",
+									"    console.log('Admin cree avec ID: ' + json.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"admin@hopital.com\",\n    \"motDePasse\": \"admin123\",\n    \"nom\": \"Dupont\",\n    \"prenom\": \"Jean\",\n    \"telephone\": \"0611111111\",\n    \"role\": \"ADMIN\",\n    \"hopitalId\": {{hopitalId}}\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/inscription",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "inscription"]
+						},
+						"description": "Creer un Admin - NECESSITE un hopital valide (executer apres creation hopital)"
+					}
+				},
+				{
+					"name": "Inscription - Donneur (USER)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Inscription Donneur reussie', function() {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"if (pm.response.code === 201) {",
+									"    var json = pm.response.json();",
+									"    pm.collectionVariables.set('token', json.token);",
+									"    pm.collectionVariables.set('userId', json.id);",
+									"    console.log('Donneur cree avec ID: ' + json.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"donneur@test.com\",\n    \"motDePasse\": \"donneur123\",\n    \"nom\": \"Martin\",\n    \"prenom\": \"Pierre\",\n    \"telephone\": \"0622222222\",\n    \"role\": \"USER\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/inscription",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "inscription"]
+						},
+						"description": "Creer un compte Donneur - AUCUNE AUTH REQUISE"
+					}
+				},
+				{
+					"name": "Connexion - Super Admin",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Connexion reussie', function() {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    var json = pm.response.json();",
+									"    pm.collectionVariables.set('token', json.token);",
+									"    pm.collectionVariables.set('userId', json.id);",
+									"    console.log('Connecte en tant que: ' + json.email);",
+									"    console.log('Role: ' + json.role);",
+									"    console.log('Token mis a jour');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"superadmin@bks.com\",\n    \"motDePasse\": \"admin123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/connexion",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "connexion"]
+						},
+						"description": "Se connecter en tant que Super Admin"
+					}
+				},
+				{
+					"name": "Connexion - Admin",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var json = pm.response.json();",
+									"    pm.collectionVariables.set('token', json.token);",
+									"    pm.collectionVariables.set('userId', json.id);",
+									"    console.log('Connecte en tant que Admin');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"admin@hopital.com\",\n    \"motDePasse\": \"admin123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/connexion",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "connexion"]
+						},
+						"description": "Se connecter en tant qu'Admin Hopital"
+					}
+				},
+				{
+					"name": "Connexion - Donneur",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var json = pm.response.json();",
+									"    pm.collectionVariables.set('token', json.token);",
+									"    pm.collectionVariables.set('userId', json.id);",
+									"    console.log('Connecte en tant que Donneur');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"donneur@test.com\",\n    \"motDePasse\": \"donneur123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/connexion",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "connexion"]
+						},
+						"description": "Se connecter en tant que Donneur"
+					}
+				},
+				{
+					"name": "Valider Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Token valide', function() {",
+									"    pm.response.to.have.status(200);",
+									"    pm.expect(pm.response.json()).to.be.true;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/auth/valider-token",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "valider-token"]
+						},
+						"description": "Verifier si le token est valide"
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Super Admin",
+			"item": [
+				{
+					"name": "Creer Hopital",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Hopital cree', function() {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    var json = pm.response.json();",
+									"    pm.collectionVariables.set('hopitalId', json.id);",
+									"    console.log('Hopital cree avec ID: ' + json.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"nom\": \"CHU Mohammed VI\",\n    \"adresse\": \"Avenue Hassan II, Quartier des Hopitaux\",\n    \"ville\": \"Casablanca\",\n    \"region\": \"Casablanca-Settat\",\n    \"telephone\": \"0522123456\",\n    \"email\": \"contact@chumed6.ma\",\n    \"capaciteStockage\": 5000,\n    \"description\": \"Centre Hospitalier Universitaire principal\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/superadmin/hopitaux",
+							"host": ["{{baseUrl}}"],
+							"path": ["superadmin", "hopitaux"]
+						},
+						"description": "Creer un hopital - REQUIERT TOKEN SUPER_ADMIN"
+					}
+				},
+				{
+					"name": "Liste Hopitaux",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/superadmin/hopitaux",
+							"host": ["{{baseUrl}}"],
+							"path": ["superadmin", "hopitaux"]
+						}
+					}
+				},
+				{
+					"name": "Valider Hopital",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Hopital valide', function() {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/superadmin/hopitaux/{{hopitalId}}/valider",
+							"host": ["{{baseUrl}}"],
+							"path": ["superadmin", "hopitaux", "{{hopitalId}}", "valider"]
+						},
+						"description": "Valider un hopital pour l'activer"
+					}
+				},
+				{
+					"name": "Dashboard Super Admin",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/superadmin/dashboard",
+							"host": ["{{baseUrl}}"],
+							"path": ["superadmin", "dashboard"]
+						}
+					}
+				},
+				{
+					"name": "Statistiques Globales",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/superadmin/stats",
+							"host": ["{{baseUrl}}"],
+							"path": ["superadmin", "stats"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Admin Hopital",
+			"item": [
+				{
+					"name": "Dashboard Admin",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/admin/dashboard",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "dashboard"]
+						},
+						"description": "Dashboard Admin - REQUIERT TOKEN ADMIN ou SUPER_ADMIN"
+					}
+				},
+				{
+					"name": "Liste Dons",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/admin/dons",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "dons"]
+						}
+					}
+				},
+				{
+					"name": "Valider Don",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/admin/dons/{{donId}}/valider",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "dons", "{{donId}}", "valider"]
+						}
+					}
+				},
+				{
+					"name": "Rejeter Don",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "\"Raison du rejet: tests sanguins non conformes\""
+						},
+						"url": {
+							"raw": "{{baseUrl}}/admin/dons/{{donId}}/rejeter",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "dons", "{{donId}}", "rejeter"]
+						}
+					}
+				},
+				{
+					"name": "Liste Demandes",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/admin/demandes",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "demandes"]
+						}
+					}
+				},
+				{
+					"name": "Traiter Demande - Satisfaire",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/admin/demandes/{{demandeId}}/traiter?statut=SATISFAITE",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "demandes", "{{demandeId}}", "traiter"],
+							"query": [
+								{
+									"key": "statut",
+									"value": "SATISFAITE"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Liste Stocks",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/admin/stocks",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "stocks"]
+						}
+					}
+				},
+				{
+					"name": "Donneurs Eligibles",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/admin/donneurs",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "donneurs"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Donneur",
+			"item": [
+				{
+					"name": "Creer Profil Donneur",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"cin\": \"AB123456\",\n    \"dateNaissance\": \"1990-05-15\",\n    \"sexe\": \"HOMME\",\n    \"groupeSanguin\": \"O_POSITIF\",\n    \"poids\": 75.0,\n    \"adresse\": \"123 Rue Hassan II\",\n    \"ville\": \"Casablanca\",\n    \"antecedentsMedicaux\": \"Aucun\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/donneur/profil",
+							"host": ["{{baseUrl}}"],
+							"path": ["donneur", "profil"]
+						},
+						"description": "Creer profil donneur - REQUIERT TOKEN USER"
+					}
+				},
+				{
+					"name": "Mon Profil",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/donneur/profil",
+							"host": ["{{baseUrl}}"],
+							"path": ["donneur", "profil"]
+						}
+					}
+				},
+				{
+					"name": "Declarer Don",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var json = pm.response.json();",
+									"    pm.collectionVariables.set('donId', json.id);",
+									"    console.log('Don cree avec ID: ' + json.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"hopitalId\": {{hopitalId}},\n    \"quantiteMl\": 450,\n    \"notes\": \"Don volontaire\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/donneur/dons",
+							"host": ["{{baseUrl}}"],
+							"path": ["donneur", "dons"]
+						}
+					}
+				},
+				{
+					"name": "Historique Dons",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/donneur/dons/historique",
+							"host": ["{{baseUrl}}"],
+							"path": ["donneur", "dons", "historique"]
+						}
+					}
+				},
+				{
+					"name": "Mes Badges",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/donneur/badges",
+							"host": ["{{baseUrl}}"],
+							"path": ["donneur", "badges"]
+						}
+					}
+				},
+				{
+					"name": "Mes Points",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/donneur/points",
+							"host": ["{{baseUrl}}"],
+							"path": ["donneur", "points"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "5. Patient",
+			"item": [
+				{
+					"name": "Creer Demande Sang",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var json = pm.response.json();",
+									"    pm.collectionVariables.set('demandeId', json.id);",
+									"    console.log('Demande creee avec ID: ' + json.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"groupeSanguinDemande\": \"O_POSITIF\",\n    \"quantiteDemandee\": 500,\n    \"hopitalId\": {{hopitalId}},\n    \"urgence\": \"HAUTE\",\n    \"nomPatient\": \"Alami\",\n    \"prenomPatient\": \"Mohammed\",\n    \"diagnostic\": \"Accident - hemorragie\",\n    \"medecinPrescripteur\": \"Dr. Benani\",\n    \"dateBesoin\": \"2024-12-20T10:00:00\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/patient/demandes",
+							"host": ["{{baseUrl}}"],
+							"path": ["patient", "demandes"]
+						}
+					}
+				},
+				{
+					"name": "Mes Demandes",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/patient/demandes",
+							"host": ["{{baseUrl}}"],
+							"path": ["patient", "demandes"]
+						}
+					}
+				},
+				{
+					"name": "Stocks Hopital",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/patient/stocks/{{hopitalId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["patient", "stocks", "{{hopitalId}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "6. Notifications",
+			"item": [
+				{
+					"name": "Mes Notifications",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/notifications",
+							"host": ["{{baseUrl}}"],
+							"path": ["notifications"]
+						}
+					}
+				},
+				{
+					"name": "Notifications Non Lues",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/notifications/non-lues",
+							"host": ["{{baseUrl}}"],
+							"path": ["notifications", "non-lues"]
+						}
+					}
+				},
+				{
+					"name": "Nombre Non Lues",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/notifications/count",
+							"host": ["{{baseUrl}}"],
+							"path": ["notifications", "count"]
+						}
+					}
+				},
+				{
+					"name": "Tout Marquer Lu",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/notifications/tout-lire",
+							"host": ["{{baseUrl}}"],
+							"path": ["notifications", "tout-lire"]
+						}
+					}
+				}
+			]
+		}
+	]
+}

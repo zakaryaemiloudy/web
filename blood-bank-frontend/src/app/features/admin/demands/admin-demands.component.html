@@ -1,0 +1,262 @@
+<div class="space-y-6">
+  <div class="flex justify-between items-center">
+    <h2 class="text-xl font-semibold text-gray-900">Demandes de sang</h2>
+    <button
+      type="button"
+      (click)="openCreateForm()"
+      class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+    >
+      + Nouvelle demande
+    </button>
+  </div>
+
+  <!-- Create Form Modal -->
+  @if (showCreateForm()) {
+    <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center">
+          <h3 class="text-lg font-semibold text-gray-900">Créer une demande de sang</h3>
+          <button
+            type="button"
+            (click)="closeCreateForm()"
+            class="text-gray-400 hover:text-gray-600"
+          >
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+
+        <form [formGroup]="createForm" (ngSubmit)="submitForm()" class="p-6 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Groupe sanguin</label>
+            <select formControlName="groupeSanguinDemande" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
+              <option value="">Sélectionner...</option>
+              @for (bg of bloodGroups; track bg) {
+                <option [value]="bg">{{ bg }}</option>
+              }
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Quantité (ml)</label>
+            <input
+              type="number"
+              formControlName="quantiteDemandee"
+              min="50"
+              step="50"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Urgence</label>
+            <select formControlName="urgence" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent">
+              @for (u of urgences; track u) {
+                <option [value]="u">{{ u }}</option>
+              }
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Nom du patient</label>
+            <input
+              type="text"
+              formControlName="nomPatient"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Prénom du patient</label>
+            <input
+              type="text"
+              formControlName="prenomPatient"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Diagnostic</label>
+            <textarea
+              formControlName="diagnostic"
+              rows="2"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            ></textarea>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Médecin prescripteur</label>
+            <input
+              type="text"
+              formControlName="medecinPrescripteur"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Date du besoin</label>
+            <input
+              type="date"
+              formControlName="dateBesoin"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Notes (optionnel)</label>
+            <textarea
+              formControlName="notes"
+              rows="2"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            ></textarea>
+          </div>
+
+          <div class="flex gap-3 pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              (click)="closeCreateForm()"
+              class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              [disabled]="!createForm.valid || submitting()"
+              class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {{ submitting() ? 'Création...' : 'Créer' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- Filter tabs -->
+  <div class="flex gap-2 border-b border-gray-200">
+    <button
+      type="button"
+      (click)="setTab('all')"
+      class="px-4 py-2 text-sm font-medium rounded-t-lg transition-colors"
+      [class.bg-white]="activeTab() === 'all'"
+      [class.text-red-600]="activeTab() === 'all'"
+      [class.border]="activeTab() === 'all'"
+      [class.border-b-0]="activeTab() === 'all'"
+      [class.border-gray-200]="activeTab() === 'all'"
+      [class.-mb-px]="activeTab() === 'all'"
+      [class.text-gray-600]="activeTab() !== 'all'"
+      [class.hover:bg-gray-50]="activeTab() !== 'all'"
+    >
+      Toutes
+    </button>
+    <button
+      type="button"
+      (click)="setTab('urgent')"
+      class="px-4 py-2 text-sm font-medium rounded-t-lg transition-colors"
+      [class.bg-white]="activeTab() === 'urgent'"
+      [class.text-red-600]="activeTab() === 'urgent'"
+      [class.border]="activeTab() === 'urgent'"
+      [class.border-b-0]="activeTab() === 'urgent'"
+      [class.border-gray-200]="activeTab() === 'urgent'"
+      [class.-mb-px]="activeTab() === 'urgent'"
+      [class.text-gray-600]="activeTab() !== 'urgent'"
+      [class.hover:bg-gray-50]="activeTab() !== 'urgent'"
+    >
+      Urgentes
+    </button>
+    <button
+      type="button"
+      (click)="setTab('encours')"
+      class="px-4 py-2 text-sm font-medium rounded-t-lg transition-colors"
+      [class.bg-white]="activeTab() === 'encours'"
+      [class.text-red-600]="activeTab() === 'encours'"
+      [class.border]="activeTab() === 'encours'"
+      [class.border-b-0]="activeTab() === 'encours'"
+      [class.border-gray-200]="activeTab() === 'encours'"
+      [class.-mb-px]="activeTab() === 'encours'"
+      [class.text-gray-600]="activeTab() !== 'encours'"
+      [class.hover:bg-gray-50]="activeTab() !== 'encours'"
+    >
+      En cours
+    </button>
+  </div>
+
+  @if (loading()) {
+    <p class="text-gray-500">Chargement...</p>
+  } @else {
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      @for (dem of filteredDemandes(); track dem.id) {
+        <div
+          class="bg-white rounded-xl shadow-sm border border-gray-200 border-l-4 hover:shadow-md transition-shadow p-5"
+          [class]="urgencyBorderClass(dem.urgence)"
+        >
+          <div class="flex items-start gap-3">
+            <app-blood-type-badge [groupeSanguin]="dem.groupeSanguinDemande" />
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium text-gray-900">{{ dem.nomPatient }} {{ dem.prenomPatient }}</p>
+              <p class="text-xs text-gray-500">#REQ-{{ dem.id }} · {{ dem.quantiteDemandee }} ml</p>
+              <p class="text-xs text-gray-600 mt-1">{{ dem.dateDemande | date:'short' }}</p>
+              <app-status-badge [status]="dem.statut" class="mt-2" />
+            </div>
+          </div>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              (click)="openCandidatures(dem.id)"
+              class="px-3 py-1.5 text-xs font-medium rounded-lg bg-purple-100 text-purple-800 hover:bg-purple-200 transition-colors flex items-center gap-1"
+            >
+              <span class="material-symbols-outlined text-sm">people</span>
+              Candidatures
+            </button>
+            @if (dem.statut === 'EN_ATTENTE' || dem.statut === 'EN_COURS') {
+              <button
+                type="button"
+                (click)="traiter(dem.id, 'SATISFAITE')"
+                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-100 text-green-800 hover:bg-green-200 transition-colors"
+              >
+                Satisfaire
+              </button>
+              <button
+                type="button"
+                (click)="traiter(dem.id, 'EN_COURS')"
+                class="px-3 py-1.5 text-xs font-medium rounded-lg bg-sky-100 text-sky-800 hover:bg-sky-200 transition-colors"
+              >
+                En cours
+              </button>
+              <button
+                type="button"
+                (click)="traiter(dem.id, 'REJETEE')"
+                class="p-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                title="Rejeter"
+              >
+                <span class="material-symbols-outlined text-lg">close</span>
+              </button>
+            }
+          </div>
+        </div>
+      } @empty {
+        <p class="col-span-full text-gray-500 py-8 text-center">Aucune demande.</p>
+      }
+    </div>
+  }
+
+  <!-- Candidatures Modal -->
+  @if (showCandidaturesModal() && selectedDemandeId()) {
+    <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div class="bg-gray-50 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 bg-white border-b border-gray-200 p-4 flex justify-between items-center">
+          <h3 class="text-lg font-semibold text-gray-900">Candidatures pour la demande #{{ selectedDemandeId() }}</h3>
+          <button
+            type="button"
+            (click)="closeCandidatures()"
+            class="text-gray-400 hover:text-gray-600"
+          >
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="p-4">
+          <app-admin-candidatures [demandeId]="selectedDemandeId()!" />
+        </div>
+      </div>
+    </div>
+  }
+</div>

@@ -1,0 +1,3 @@
+-cp
+@classpath.txt
+com.bks.BksApplication

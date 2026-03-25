@@ -1,0 +1,157 @@
+<div class="space-y-6">
+  <h2 class="text-xl font-semibold text-gray-900">Demandes de sang</h2>
+
+  <!-- Tabs -->
+  <div class="flex gap-2 border-b border-gray-200">
+    <button
+      type="button"
+      (click)="setTab('available')"
+      class="px-4 py-2 text-sm font-medium rounded-t-lg transition-colors"
+      [class.bg-white]="activeTab() === 'available'"
+      [class.text-red-600]="activeTab() === 'available'"
+      [class.border]="activeTab() === 'available'"
+      [class.border-b-0]="activeTab() === 'available'"
+      [class.border-gray-200]="activeTab() === 'available'"
+      [class.-mb-px]="activeTab() === 'available'"
+      [class.text-gray-600]="activeTab() !== 'available'"
+      [class.hover:bg-gray-50]="activeTab() !== 'available'"
+    >
+      Demandes disponibles
+    </button>
+    <button
+      type="button"
+      (click)="setTab('applied')"
+      class="px-4 py-2 text-sm font-medium rounded-t-lg transition-colors"
+      [class.bg-white]="activeTab() === 'applied'"
+      [class.text-red-600]="activeTab() === 'applied'"
+      [class.border]="activeTab() === 'applied'"
+      [class.border-b-0]="activeTab() === 'applied'"
+      [class.border-gray-200]="activeTab() === 'applied'"
+      [class.-mb-px]="activeTab() === 'applied'"
+      [class.text-gray-600]="activeTab() !== 'applied'"
+      [class.hover:bg-gray-50]="activeTab() !== 'applied'"
+    >
+      Mes candidatures
+    </button>
+  </div>
+
+  @if (activeTab() === 'available' && loading()) {
+    <p class="text-gray-500">Chargement des demandes...</p>
+  } @else if (activeTab() === 'applied' && applicationsLoading()) {
+    <p class="text-gray-500">Chargement de vos candidatures...</p>
+  } @else {
+    @if (activeTab() === 'available') {
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        @for (req of requests(); track req.id) {
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden">
+            <div class="p-5 space-y-4">
+              <!-- Header -->
+              <div class="flex items-start justify-between">
+                <div class="flex items-start gap-3">
+                  <app-blood-type-badge [groupeSanguin]="req.groupeSanguinDemande" />
+                  <div>
+                    <p class="font-semibold text-gray-900">{{ req.nomPatient }} {{ req.prenomPatient }}</p>
+                    <p class="text-xs text-gray-500">#REQ-{{ req.id }}</p>
+                  </div>
+                </div>
+                <span [class]="'px-2 py-1 text-xs font-medium rounded-full ' + urgencyBadgeClass(req.urgence)">
+                  {{ urgencyLabel(req.urgence) }}
+                </span>
+              </div>
+
+              <!-- Info -->
+              <div class="space-y-2 text-sm">
+                <div class="flex justify-between text-gray-600">
+                  <span>Quantité:</span>
+                  <span class="font-medium text-gray-900">{{ req.quantiteDemandee }} ml</span>
+                </div>
+                <div class="flex justify-between text-gray-600">
+                  <span>Diagnostic:</span>
+                  <span class="font-medium text-gray-900 text-right">{{ req.diagnostic }}</span>
+                </div>
+                <div class="flex justify-between text-gray-600">
+                  <span>Médecin:</span>
+                  <span class="font-medium text-gray-900 text-right">{{ req.medecinPrescripteur }}</span>
+                </div>
+                <div class="flex justify-between text-gray-600">
+                  <span>Date besoin:</span>
+                  <span class="font-medium text-gray-900">{{ req.dateBesoin | date:'short' }}</span>
+                </div>
+              </div>
+
+              @if (req.notes) {
+                <div class="pt-2 border-t border-gray-200">
+                  <p class="text-xs text-gray-600 italic">{{ req.notes }}</p>
+                </div>
+              }
+
+              <!-- Action -->
+              <button
+                type="button"
+                (click)="postulDemande(req.id)"
+                [disabled]="applyingFor() === req.id"
+                class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                {{ applyingFor() === req.id ? 'Envoi en cours...' : 'Postuler' }}
+              </button>
+            </div>
+          </div>
+        } @empty {
+          <p class="col-span-full text-gray-500 py-8 text-center">Aucune demande disponible pour votre groupe sanguin.</p>
+        }
+      </div>
+    } @else {
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        @for (app of myApplications(); track app.id) {
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden">
+            <div class="p-5 space-y-4">
+              <!-- Header -->
+              <div class="flex items-start justify-between">
+                <div class="flex items-start gap-3">
+                  <app-blood-type-badge [groupeSanguin]="app.groupeSanguinDemande" />
+                  <div>
+                    <p class="font-semibold text-gray-900">#REQ-{{ app.demandeId }}</p>
+                    <p class="text-xs text-gray-500">Candidature #{{ app.id }}</p>
+                  </div>
+                </div>
+                <span [class]="'px-2 py-1 text-xs font-medium rounded-full ' + apparitionBadgeClass(app.statut)">
+                  {{ apparitionLabel(app.statut) }}
+                </span>
+              </div>
+
+              <!-- Info -->
+              <div class="space-y-2 text-sm">
+                <div class="flex justify-between text-gray-600">
+                  <span>Groupe sanguin:</span>
+                  <span class="font-medium text-gray-900">{{ app.donneurGroupeSanguin }}</span>
+                </div>
+                <div class="flex justify-between text-gray-600">
+                  <span>Groupe demandé:</span>
+                  <span class="font-medium text-gray-900">{{ app.groupeSanguinDemande }}</span>
+                </div>
+                <div class="flex justify-between text-gray-600">
+                  <span>Date candidature:</span>
+                  <span class="font-medium text-gray-900">{{ app.dateCandidature | date:'short' }}</span>
+                </div>
+                @if (app.dateTraitement) {
+                  <div class="flex justify-between text-gray-600">
+                    <span>Traité:</span>
+                    <span class="font-medium text-gray-900">{{ app.dateTraitement | date:'short' }}</span>
+                  </div>
+                }
+              </div>
+
+              @if (app.notes) {
+                <div class="pt-2 border-t border-gray-200">
+                  <p class="text-xs text-gray-600 italic">{{ app.notes }}</p>
+                </div>
+              }
+            </div>
+          </div>
+        } @empty {
+          <p class="col-span-full text-gray-500 py-8 text-center">Vous n'avez pas encore postulé pour une demande.</p>
+        }
+      </div>
+    }
+  }
+</div>
