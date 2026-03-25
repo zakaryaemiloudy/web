@@ -1,348 +1,333 @@
-# 🏥 Blood Bank Management System
+# 🏥 Système de Gestion Banque de Sang
 
-A comprehensive blood bank management platform that connects patients, hospitals, donors, and administrators to streamline blood donation and distribution processes.
+Plateforme complète de gestion de banque de sang qui connecte patients, hôpitaux, donneurs et administrateurs pour optimiser les processus de don et distribution de sang.
 
-## 🩸 About This Application
+## 🩸 À Propos de Cette Application
 
-The Blood Bank Management System is a full-stack web application designed to:
-- **Manage blood donations** and inventory across multiple hospitals
-- **Connect patients** with blood banks for urgent needs
-- **Coordinate blood requests** between patients and hospitals
-- **Track donor information** and donation history
-- **Provide real-time analytics** and reporting for administrators
-- **Offer AI-powered assistance** through an intelligent chatbot
+Le Système de Gestion Banque de Sang est une application web complète conçue pour :
+- **Gérer les dons de sang** et l'inventaire dans plusieurs hôpitaux
+- **Connecter les patients** avec les banques de sang pour leurs besoins urgents
+- **Coordonner les demandes de sang** entre patients et hôpitaux
+- **Suivre les informations des donneurs** et l'historique des dons
+- **Fournir des analytics en temps réel** et rapports pour les administrateurs
+- **Offrir une assistance IA** via un chatbot intelligent
 
-## 🎯 Key Features
+## 🎯 Fonctionnalités Clés
 
-### 👤 Patient Portal
-- **Blood Request Management**: Submit and track blood donation requests
-- **Hospital Selection**: Choose from registered hospitals
-- **Request Status Tracking**: Monitor request progress in real-time
-- **Emergency Requests**: Priority handling for urgent medical needs
-- **Donation History**: View past requests and outcomes
+### 👤 Portail Patient
+- **Gestion des Demandes de Sang**: Soumettre et suivre les demandes de don de sang
+- **Sélection d'Hôpital**: Choisir parmi les hôpitaux enregistrés
+- **Suivi du Statut des Demandes**: Surveiller l'avancement des demandes en temps réel
+- **Demandes d'Urgence**: Traitement prioritaire pour les besoins médicaux urgents
+- **Historique des Dons**: Voir les demandes passées et leurs résultats
 
-### 🏥 Hospital Management
-- **Demand Processing**: Review and approve/reject blood requests
-- **Stock Management**: Monitor blood inventory levels by type
-- **Critical Alerts**: Get notified when blood stocks are low
-- **Profile Management**: Update hospital information and contact details
-- **Request Analytics**: Track request patterns and blood type distribution
+### 🏥 Gestion Hospitalière
+- **Traitement des Demandes**: Examiner et approuver/rejeter les demandes de sang
+- **Gestion des Stocks**: Surveiller les niveaux d'inventaire de sang par type
+- **Alertes Critiques**: Être notifié lorsque les stocks de sang sont bas
+- **Gestion de Profil**: Mettre à jour les informations hospitalières et coordonnées
+- **Analytics des Demandes**: Suivre les tendances des demandes et distribution des groupes sanguins
 
-### 🩸 Donor System
-- **Donor Registration**: Complete donor profile creation
-- **Eligibility Verification**: Automated screening based on medical criteria
-- **Donation History**: Track all donations and impact
-- **Appointment Scheduling**: Book donation slots at preferred locations
-- **Impact Tracking**: See how donations have helped patients
+### 🩸 Système Donneur
+- **Inscription Donneur**: Création complète de profil donneur
+- **Vérification d'Éligibilité**: Dépistage automatisé basé sur critères médicaux
+- **Historique des Dons**: Suivre tous les dons et leur impact
+- **Planification de Rendez-vous**: Réserver des créneaux de don aux emplacements préférés
+- **Suivi d'Impact**: Voir comment les dons ont aidé les patients
 
-### 📊 Admin Dashboard
-- **System Analytics**: Comprehensive statistics and insights
-- **User Management**: Manage all user roles and permissions
-- **Hospital Oversight**: Monitor all registered hospitals
-- **Campaign Management**: Create and manage donation campaigns
-- **Emergency Coordination**: Handle critical blood shortage situations
+### 📊 Tableau de Bord Admin
+- **Analytics Système**: Statistiques et insights complets
+- **Gestion des Utilisateurs**: Gérer tous les rôles et permissions utilisateurs
+- **Supervision Hospitalière**: Surveiller tous les hôpitaux enregistrés
+- **Gestion de Campagnes**: Créer et gérer les campagnes de don
+- **Coordination d'Urgence**: Gérer les situations critiques de pénurie de sang
 
-### 🤖 AI Chatbot Assistant
-- **24/7 Support**: Intelligent assistant for common questions
-- **Blood Type Information**: Educational content about blood types and compatibility
-- **Donation Guidance**: Step-by-step donation process assistance
-- **Emergency Information**: Critical contacts and procedures
-- **Multi-language Support**: Accessible in multiple languages
+### 🤖 Assistant Chatbot IA
+- **Support 24/7**: Assistant intelligent pour les questions courantes
+- **Informations sur Groupes Sanguins**: Contenu éducatif sur les groupes sanguins et compatibilité
+- **Guide de Don**: Assistance étape par étape du processus de don
+- **Informations d'Urgence**: Contacts et procédures critiques
+- **Support Multilingue**: Accessible en plusieurs langues
 
-## 🏗️ System Architecture
+## 🏗️ Architecture Système
 
 ### Frontend (Angular 17+)
-- **Framework**: Angular 17 with standalone components
-- **UI Library**: Tailwind CSS with Material Design icons
-- **State Management**: Angular signals for reactive state
-- **Routing**: Role-based access control with guards
-- **Forms**: Reactive forms with comprehensive validation
-- **HTTP Client**: RESTful API integration
+- **Framework**: Angular 17 avec composants standalone
+- **Bibliothèque UI**: Tailwind CSS avec icônes Material Design
+- **Gestion d'État**: Signaux Angular pour état réactif
+- **Routing**: Contrôle d'accès par rôle avec guards
+- **Formulaires**: Formulaires réactifs avec validation complète
+- **Client HTTP**: Intégration API RESTful
 
 ### Backend (Spring Boot)
-- **Framework**: Spring Boot 3.x with Java 17
-- **Database**: MySQL with JPA/Hibernate ORM
-- **Security**: Spring Security with JWT authentication
-- **API Documentation**: OpenAPI/Swagger integration
-- **Validation**: Comprehensive input validation and error handling
+- **Framework**: Spring Boot 3.x avec Java 17
+- **Base de Données**: MySQL avec ORM JPA/Hibernate
+- **Sécurité**: Spring Security avec authentification JWT
+- **Documentation API**: Intégration OpenAPI/Swagger
+- **Validation**: Validation complète des entrées et gestion d'erreurs
 
-### Database Schema
-- **Users**: Patient, donor, hospital, and admin accounts
-- **Blood Requests**: Patient blood demand tracking
-- **Donations**: Donor blood donation records
-- **Inventory**: Hospital blood stock management
-- **Hospitals**: Registered medical facilities
-- **Campaigns**: Blood donation campaigns and events
+### Schéma Base de Données
+- **Utilisateurs**: Comptes patient, donneur, hôpital et admin
+- **Demandes de Sang**: Suivi des demandes de sang des patients
+- **Dons**: Enregistrements des dons de sang des donneurs
+- **Inventaire**: Gestion des stocks de sang hospitaliers
+- **Hôpitaux**: Établissements médicaux enregistrés
+- **Campagnes**: Campagnes et événements de don de sang
 
-## 🚀 Quick Start
+## 🚀 Démarrage Rapide
 
-### Prerequisites
-- **Node.js** 18+ and npm/yarn
-- **Java** 17+ and Maven
+### Prérequis
+- **Node.js** 18+ et npm/yarn
+- **Java** 17+ et Maven
 - **MySQL** 8.0+
-- **Git** for version control
+- **Git** pour contrôle de version
 
 ### Installation
 
-#### 1. Clone the Repository
+#### 1. Cloner le Dépôt
 ```bash
-git clone <repository-url>
+git clone <url-dépôt>
 cd blood-bank-system
 ```
 
-#### 2. Backend Setup (Spring Boot)
+#### 2. Configuration Backend (Spring Boot)
 ```bash
 cd Bks
 
-# Configure Database
-# Update src/main/resources/application.properties with your MySQL credentials
+# Configurer la Base de Données
+# Mettre à jour src/main/resources/application.properties avec vos identifiants MySQL
 spring.datasource.url=jdbc:mysql://localhost:3306/blood_bank
-spring.datasource.username=your_username
-spring.datasource.password=your_password
+spring.datasource.username=votre_nom_utilisateur
+spring.datasource.password=votre_mot_de_passe
 
-# Install Dependencies and Run
+# Installer Dépendances et Exécuter
 mvn clean install
 mvn spring-boot:run
 ```
 
-The backend will be available at: `http://localhost:8080`
+Le backend sera disponible à: `http://localhost:8080`
 
-#### 3. Frontend Setup (Angular)
+#### 3. Configuration Frontend (Angular)
 ```bash
 cd blood-bank-frontend
 
-# Install Dependencies
+# Installer Dépendances
 npm install
 
-# Start Development Server
+# Démarrer Serveur de Développement
 npm start
 ```
 
-The frontend will be available at: `http://localhost:4200`
+Le frontend sera disponible à: `http://localhost:4200`
 
-#### 4. Database Setup
+#### 4. Configuration Base de Données
 ```sql
-# Create MySQL Database
+# Créer Base de Données MySQL
 CREATE DATABASE blood_bank;
 
-# Run Migration Scripts (if available)
-# Located in: Bks/src/main/resources/db/migration/
+# Exécuter Scripts de Migration (si disponibles)
+# Localisé dans: Bks/src/main/resources/db/migration/
 ```
 
-## 📱 Access Points
+## 📱 Points d'Accès
 
-### Application URLs
-- **Frontend Application**: http://localhost:4200
-- **Backend API**: http://localhost:8080/api
-- **API Documentation**: http://localhost:8080/swagger-ui.html
+### URLs Application
+- **Application Frontend**: http://localhost:4200
+- **API Backend**: http://localhost:8080/api
+- **Documentation API**: http://localhost:8080/swagger-ui.html
 
-### Default Login Credentials
+### Identifiants de Connexion par Défaut
 ```
-Admin User:
+Utilisateur Admin:
 - Email: admin@bloodbank.com
-- Password: admin123
+- Mot de passe: admin123
 
-Hospital User:
+Utilisateur Hôpital:
 - Email: hospital@bloodbank.com  
-- Password: hospital123
+- Mot de passe: hospital123
 
-Patient User:
+Utilisateur Patient:
 - Email: patient@bloodbank.com
-- Password: patient123
+- Mot de passe: patient123
 ```
 
-## 🎮 How to Use the Application
+## 🎮 Comment Utiliser l'Application
 
-### For Patients
-1. **Register/Login**: Create an account or log in
-2. **Submit Request**: Navigate to "Demandes" → "Nouvelle demande"
-3. **Fill Form**: Complete blood request details
-4. **Select Hospital**: Choose preferred hospital from dropdown
-5. **Track Status**: Monitor request progress in dashboard
+### Pour les Patients
+1. **S'inscrire/Se connecter**: Créer un compte ou se connecter
+2. **Soumettre Demande**: Naviguer vers "Demandes" → "Nouvelle demande"
+3. **Remplir Formulaire**: Compléter les détails de la demande de sang
+4. **Sélectionner Hôpital**: Choisir l'hôpital préféré dans la liste déroulante
+5. **Suivre Statut**: Surveiller l'avancement de la demande dans le tableau de bord
 
-### For Hospital Staff
-1. **Login**: Access hospital portal with credentials
-2. **View Requests**: Navigate to "Demandes de sang"
-3. **Process Requests**: Review, approve, or reject requests
-4. **Manage Stocks**: Check inventory levels in "Stocks"
-5. **Update Profile**: Edit hospital information in "Profil"
+### Pour le Personnel Hospitalier
+1. **Connexion**: Accéder au portail hospitalier avec identifiants
+2. **Voir Demandes**: Naviguer vers "Demandes de sang"
+3. **Traiter Demandes**: Examiner, approuver ou rejeter les demandes
+4. **Gérer Stocks**: Vérifier les niveaux d'inventaire dans "Stocks"
+5. **Mettre à Jour Profil**: Éditer les informations hospitalières dans "Profil"
 
-### For Administrators
-1. **Dashboard Access**: View system overview and statistics
-2. **User Management**: Manage all user accounts and roles
-3. **Hospital Oversight**: Monitor hospital activities
-4. **Campaign Creation**: Launch donation campaigns
-5. **Emergency Response**: Handle critical situations
+### Pour les Administrateurs
+1. **Accès Tableau de Bord**: Voir aperçu système et statistiques
+2. **Gestion Utilisateurs**: Gérer tous les comptes et rôles utilisateurs
+3. **Supervision Hospitalière**: Surveiller les activités hospitalières
+4. **Création Campagnes**: Lancer des campagnes de don
+5. **Réponse d'Urgence**: Gérer les situations critiques
 
-### AI Chatbot Usage
-1. **Access**: Click chatbot icon or navigate to `/chatbot`
-2. **Ask Questions**: Type queries about blood donation, hospitals, etc.
-3. **Quick Actions**: Use pre-defined buttons for common questions
-4. **Get Help**: Receive instant assistance 24/7
+### Utilisation Chatbot IA
+1. **Accès**: Cliquer sur l'icône chatbot ou naviguer vers `/chatbot`
+2. **Poser Questions**: Taper des requêtes sur le don de sang, hôpitaux, etc.
+3. **Actions Rapides**: Utiliser les boutons prédéfinis pour les questions courantes
+4. **Obtenir de l'Aide**: Recevoir une assistance instantanée 24/7
 
-## 🔧 Development Guide
+## 🔧 Guide de Développement
 
-### Project Structure
+### Structure Projet
 ```
 blood-bank-system/
-├── Bks/                          # Spring Boot Backend
-│   ├── src/main/java/com/bks/    # Java source code
-│   ├── src/main/resources/       # Configuration files
-│   └── pom.xml                   # Maven dependencies
-├── blood-bank-frontend/          # Angular Frontend
-│   ├── src/app/                  # Angular application code
-│   ├── src/assets/               # Static assets
-│   ├── package.json              # Node dependencies
-│   └── angular.json              # Angular configuration
-├── .gitignore                    # Git ignore file
-└── README.md                     # This documentation
+├── Bks/                          # Backend Spring Boot
+│   ├── src/main/java/com/bks/    # Code source Java
+│   ├── src/main/resources/       # Fichiers configuration
+│   └── pom.xml                   # Dépendances Maven
+├── blood-bank-frontend/          # Frontend Angular
+│   ├── src/app/                  # Code application Angular
+│   ├── src/assets/               # Assets statiques
+│   ├── package.json              # Dépendances Node
+│   └── angular.json              # Configuration Angular
+├── .gitignore                    # Fichier Git ignore
+└── README.md                     # Cette documentation
 ```
 
-### Frontend Development
+### Développement Frontend
 ```bash
-# Install new dependencies
-npm install <package-name>
+# Installer nouvelles dépendances
+npm install <nom-package>
 
-# Run tests
+# Exécuter tests
 ng test
 
-# Build for production
+# Construire pour production
 ng build
 
-# Generate new component
-ng generate component component-name
+# Générer nouveau composant
+ng generate component nom-composant
 ```
 
-### Backend Development
+### Développement Backend
 ```bash
-# Compile and run tests
+# Compiler et exécuter tests
 mvn test
 
-# Package application
+# Packager application
 mvn package
 
-# Run with specific profile
+# Exécuter avec profil spécifique
 mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-### API Endpoints
-- **Authentication**: `/api/auth/*`
-- **Patient Operations**: `/api/patient/*`
-- **Hospital Operations**: `/api/hospital/*`
-- **Admin Operations**: `/api/admin/*`
-- **Blood Requests**: `/api/demandes/*`
-- **Donations**: `/api/dons/*`
+### Points d'Accès API
+- **Authentification**: `/api/auth/*`
+- **Opérations Patient**: `/api/patient/*`
+- **Opérations Hôpital**: `/api/hospital/*`
+- **Opérations Admin**: `/api/admin/*`
+- **Demandes de Sang**: `/api/demandes/*`
+- **Dons**: `/api/dons/*`
 
-## 🛡️ Security Features
+## 🛡️ Fonctionnalités de Sécurité
 
-### Authentication & Authorization
-- **JWT Tokens**: Secure token-based authentication
-- **Role-Based Access**: Different permissions for each user type
-- **Password Encryption**: Bcrypt hashing for password security
-- **Session Management**: Secure session handling
+### Authentification & Autorisation
+- **Tokens JWT**: Authentification sécurisée par token
+- **Accès par Rôle**: Permissions différentes pour chaque type d'utilisateur
+- **Chiffrement Mot de Passe**: Hachage Bcrypt pour sécurité des mots de passe
+- **Gestion Session**: Gestion sécurisée des sessions
 
-### Data Protection
-- **Input Validation**: Comprehensive validation on all inputs
-- **SQL Injection Prevention**: Parameterized queries
-- **XSS Protection**: Output encoding and CSP headers
-- **CORS Configuration**: Proper cross-origin resource sharing
+### Protection des Données
+- **Validation des Entrées**: Validation complète sur toutes les entrées
+- **Prévention Injection SQL**: Requêtes paramétrées
+- **Protection XSS**: Encodage des sorties et en-têtes CSP
+- **Configuration CORS**: Partage approprié des ressources cross-origin
 
-## 📊 System Features Overview
+## 📊 Aperçu Fonctionnalités Système
 
-### Blood Type Compatibility
-- **Universal Donors**: O- (can donate to all types)
-- **Universal Recipients**: AB+ (can receive from all types)
-- **Type Matching**: Automatic compatibility checking
-- **Emergency Protocols**: Special handling for critical situations
+### Compatibilité Groupes Sanguins
+- **Donneurs Universels**: O- (peut donner à tous les types)
+- **Receveurs Universels**: AB+ (peut recevoir de tous les types)
+- **Correspondance des Types**: Vérification automatique de compatibilité
+- **Protocoles d'Urgence**: Traitement spécial pour les situations critiques
 
-### Request Workflow
-1. **Patient Submission** → **Hospital Review** → **Status Update** → **Donor Notification** → **Fulfillment**
-2. **Real-time Updates**: Status changes communicated instantly
-3. **Priority Handling**: Emergency requests processed first
-4. **Quality Control**: All requests validated before processing
+### Workflow des Demandes
+1. **Soumission Patient** → **Examen Hôpital** → **Mise à Jour Statut** → **Notification Donneur** → **Exécution**
+2. **Mises à Jour Temps Réel**: Changements de statut communiqués instantanément
+3. **Traitement Prioritaire**: Demandes d'urgence traitées en premier
+4 **Contrôle Qualité**: Toutes les demandes validées avant traitement
 
-### Inventory Management
-- **Real-time Tracking**: Live stock level monitoring
-- **Critical Alerts**: Automatic notifications for low stock
-- **Expiration Tracking**: Monitor blood product expiry dates
-- **Distribution Planning**: Optimize blood allocation
+### Gestion d'Inventaire
+- **Suivi Temps Réel**: Surveillance continue des niveaux de stock
+- **Alertes Critiques**: Notifications automatiques pour stocks bas
+- **Suivi d'Expiration**: Surveiller les dates d'expiration des produits sanguins
+- **Planification Distribution**: Optimiser l'allocation du sang
 
-## 🤝 Contributing Guidelines
+## 🤝 Directives de Contribution
 
-### Code Standards
-- **Frontend**: Follow Angular style guide and TypeScript best practices
-- **Backend**: Follow Java coding conventions and Spring Boot patterns
-- **Documentation**: Update README and code comments for new features
-- **Testing**: Write unit tests for all new functionality
+### Standards de Code
+- **Frontend**: Suivre le guide de style Angular et meilleures pratiques TypeScript
+- **Backend**: Suivre les conventions de codage Java et patterns Spring Boot
+- **Documentation**: Mettre à jour README et commentaires de code pour nouvelles fonctionnalités
+- **Tests**: Écrire des tests unitaires pour toute nouvelle fonctionnalité
 
-### Git Workflow
-1. **Create Feature Branch**: `git checkout -b feature/feature-name`
-2. **Make Changes**: Implement your feature with proper testing
-3. **Commit Changes**: `git commit -m "feat: add new feature"`
-4. **Push Branch**: `git push origin feature/feature-name`
-5. **Create Pull Request**: Submit for code review
+### Workflow Git
+1. **Créer Branche de Fonctionnalité**: `git checkout -b feature/nom-fonctionnalité`
+2. **Apporter Modifications**: Implémenter votre fonctionnalité avec tests appropriés
+3. **Valider Modifications**: `git commit -m "feat: ajouter nouvelle fonctionnalité"`
+4. **Pousser Branche**: `git push origin feature/nom-fonctionnalité`
+5. **Créer Pull Request**: Soumettre pour revue de code
 
-## 🐛 Troubleshooting
+## 🐛 Dépannage
 
-### Common Issues
+### Problèmes Communs
 
-#### Backend Issues
-- **Database Connection**: Verify MySQL credentials and database exists
-- **Port Conflicts**: Ensure port 8080 is available
-- **Java Version**: Confirm Java 17+ is installed
+#### Problèmes Backend
+- **Connexion Base de Données**: Vérifier identifiants MySQL et existence base de données
+- **Conflits de Ports**: S'assurer que le port 8080 est disponible
+- **Version Java**: Confirmer que Java 17+ est installé
 
-#### Frontend Issues
-- **Node Version**: Ensure Node.js 18+ is installed
-- **Port Conflicts**: Check if port 4200 is available
-- **Dependency Issues**: Run `npm install` to refresh dependencies
+#### Problèmes Frontend
+- **Version Node**: S'assurer que Node.js 18+ est installé
+- **Conflits de Ports**: Vérifier si le port 4200 est disponible
+- **Problèmes de Dépendances**: Exécuter `npm install` pour rafraîchir les dépendances
 
-#### Database Issues
-- **Migration Failures**: Check SQL syntax and permissions
-- **Connection Timeouts**: Verify database server is running
-- **Permission Errors**: Ensure database user has proper privileges
+#### Problèmes Base de Données
+- **Échecs de Migration**: Vérifier la syntaxe SQL et permissions
+- **Timeouts de Connexion**: Vérifier que le serveur de base de données fonctionne
+- **Erreurs de Permission**: S'assurer que l'utilisateur de base de données a les privilèges appropriés
 
-### Getting Help
-1. **Check Logs**: Review application logs for error details
-2. **Documentation**: Refer to API documentation at `/swagger-ui.html`
-3. **Community**: Post issues in project repository discussions
-4. **Support**: Contact development team for critical issues
+### Obtenir de l'Aide
+1. **Vérifier Logs**: Examiner les logs d'application pour détails d'erreur
+2. **Documentation**: Référer à la documentation API à `/swagger-ui.html`
+3. **Communauté**: Poster des issues dans les discussions du dépôt projet
+4. **Support**: Contacter l'équipe de développement pour les problèmes critiques
 
-## 📈 Future Enhancements
+## 📈 Améliorations Futures
 
-### Planned Features
-- **Mobile Application**: Native iOS and Android apps
-- **Blood Bank Locator**: GPS-based nearby blood bank finder
-- **Donor Matching**: AI-powered donor-patient matching system
-- **Real-time Notifications**: SMS and email alerts
-- **Blockchain Integration**: Enhanced security and transparency
-- **Machine Learning**: Predictive analytics for demand forecasting
+### Fonctionnalités Planifiées
+- **Application Mobile**: Applications natives iOS et Android
+- **Localisateur Banque de Sang**: Recherche GPS de banques de sang à proximité
+- **Correspondance Donneur**: Système de correspondance donneur-patient par IA
+- **Notifications Temps Réel**: Alertes SMS et email
+- **Intégration Blockchain**: Sécurité et transparence améliorées
+- **Machine Learning**: Analytics prédictifs pour prévision de la demande
 
-### Technical Improvements
-- **Microservices Architecture**: Split into smaller, focused services
-- **Docker Containerization**: Simplified deployment and scaling
-- **Cloud Integration**: AWS/Azure deployment options
-- **Performance Optimization**: Caching and database optimization
-- **Advanced Analytics**: Business intelligence and reporting
+### Améliorations Techniques
+- **Architecture Microservices**: Diviser en services plus petits et focalisés
+- **Conteneurisation Docker**: Déploiement et scalabilité simplifiés
+- **Intégration Cloud**: Options de déploiement AWS/Azure
+- **Optimisation Performance**: Mise en cache et optimisation base de données
+- **Analytics Avancés**: Business intelligence et rapports
 
-## 📄 License
+## 📄 Licence
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 👥 Development Team
-
-- **Project Lead**: [Your Name]
-- **Backend Developer**: [Backend Developer Name]
-- **Frontend Developer**: [Frontend Developer Name]
-- **UI/UX Designer**: [Designer Name]
-- **Database Administrator**: [DBA Name]
-
-## 📞 Contact & Support
-
-- **Email**: support@bloodbank.com
-- **Documentation**: [Documentation Link]
-- **Issue Tracker**: [GitHub Issues Link]
-- **Community Forum**: [Forum Link]
+Ce projet est sous licence MIT - voir le fichier LICENSE pour détails.
 
 ---
 
-**Thank you for using the Blood Bank Management System! Together, we're saving lives through technology and innovation.** 🩸❤️
+**Merci d'utiliser le Système de Gestion Banque de Sang! Ensemble, nous sauvons des vies grâce à la technologie et l'innovation.** 🩸❤️

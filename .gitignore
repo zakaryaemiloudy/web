@@ -1,230 +1,43 @@
-# Angular / TypeScript / Frontend
-
 # Dependencies
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
 
 # Build outputs
 dist/
 build/
-.next/
-out/
-
-# Angular specific
-.angular/
-.ng-dev/
-.nx/
-coverage/
-tmp/
-temp/
+target/
 
 # IDE files
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
+.qodo/
 
-# OS generated files
+# OS files
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
+*~
 
 # Logs
-logs/
 *.log
-
-# Runtime data
-pids/
-*.pid
-*.seed
-*.pid.lock
+logs/
 
 # Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env*
+application-*.properties
 
-# Cache directories
+# Cache
 .cache/
-.parcel-cache/
-
-# Testing
 coverage/
-.nyc_output/
-junit.xml
-test-results/
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
-
-# next.js build output
-.next
-
-# nuxt.js build output
-.nuxt
-
-# vuepress build output
-.vuepress/dist
-
-# Serverless directories
-.serverless
-
-# FuseBox cache
-.fusebox/
-
-# DynamoDB Local files
-.dynamodb/
-
-# TernJS port file
-.tern-port
-
-# Stores VSCode versions used for testing VSCode extensions
-.vscode-test
-
-# Storybook build outputs
-storybook-static/
-
-# Temporary folders
-tmp/
-temp/
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Local configuration files
-angular.json
-!angular.json
-
-# Backend specific (Java/Spring Boot)
-
-# Maven
-target/
-!.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
-
-# Gradle
-.gradle
-build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-# IntelliJ IDEA
-.idea/
-*.iws
-*.iml
-*.ipr
-out/
-!**/src/main/**/out/
-!**/src/test/**/out/
-
-# Eclipse
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
-
-# NetBeans
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-
-# VS Code
-.vscode/
-
-# macOS
-.DS_Store
-
-# Windows
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-
-# Linux
-*~
-.qodo/
-# Spring Boot
-application-local.properties
-application-dev.properties
-application-prod.properties
 
 # Database
 *.db
 *.sqlite
-*.sqlite3
-
-# Logs
-logs/
-*.log
 
 # Temporary files
+tmp/
 *.tmp
-*.temp
-
-# Backup files
 *.bak
-*.backup
-*.orig
 
-# Generated documentation
-docs/generated/
-
-# API Keys and secrets
-secrets/
-*.pem
+# API Keys
 *.key
-*.crt
-
-# Docker
-.dockerignore
-docker-compose.override.yml
-
-# Kubernetes
-*.kubeconfig
-
-# Application specific
-uploads/
-static/uploads/
-media/
+*.pem
+secrets/
