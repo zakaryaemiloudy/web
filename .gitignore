@@ -1,52 +1,121 @@
-# Dependencies
-node_modules/
-
-# Build outputs
-dist/
-build/
-target/
-
-# IDE files
-.vscode/
+# =========================
+# IDE / editor folders
+# =========================
 .idea/
 .qodo/
+.vscode/
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+.history/
+.apt_generated
+.factorypath
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
 
-# OS files
+# =========================
+# OS junk
+# =========================
 .DS_Store
 Thumbs.db
 *~
 
+# =========================
 # Logs
+# =========================
 *.log
 logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Environment variables
-.env*
-application-*.properties
-
-# Cache
-.cache/
-coverage/
-
-# Database
-*.db
-*.sqlite
-
-# Temporary files
+# =========================
+# Node / Angular
+# =========================
+node_modules/
+dist/
+build/
+out-tsc/
 tmp/
+coverage/
+.angular/
+.angular-cache/
+.sass-cache/
+bazel-out/
+libpeerconnection.log
+testem.log
+typings/
+__screenshots__/
+/e2e/test-output/
+.ng/
+.angular-cli.json
+/connect.lock
+package-lock.json
+yarn.lock
+
+# TypeScript
+*.tsbuildinfo
+
+# =========================
+# Java / Spring Boot / Maven
+# =========================
+target/
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+HELP.md
+*.iws
+*.iml
+*.ipr
+
+# IntelliJ / JetBrains project files
+*.class
+*.jar
+*.war
+*.ear
 *.tmp
 *.bak
 
-# API Keys
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/nbdist/
+/.nb-gradle/
+
+# =========================
+# Environment / secrets
+# =========================
+.env
+.env.*
+application-*.properties
+secrets/
 *.key
 *.pem
-secrets/
 
+# =========================
+# Database / temp
+# =========================
+*.db
+*.sqlite
+.cache/
 
-
+# =========================
+# Project-specific unnecessary files
+# =========================
+Bks.zip
 directions.txt
 init-test-data.sql
 project-description.md
 stitch.txt
 test-data.sql
-Bks.zip
+README_GITHUB.md
