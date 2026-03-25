@@ -41,3 +41,12 @@ tmp/
 *.key
 *.pem
 secrets/
+
+
+
+directions.txt
+init-test-data.sql
+project-description.md
+stitch.txt
+test-data.sql
+Bks.zip
