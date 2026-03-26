@@ -30,6 +30,7 @@ import { PatientDemandeFormComponent } from './features/patient/demande-form/pat
 import { HospitalDemandsComponent } from './features/hospital/demands/hospital-demands.component';
 import { HospitalStocksComponent } from './features/hospital/stocks/hospital-stocks.component';
 import { HospitalProfileComponent } from './features/hospital/profile/hospital-profile.component';
+import { AdminManagementComponent } from './features/super-admin/admin-management/admin-management.component';
 import { NotificationsComponent } from './features/notifications/notifications.component';
 import { ChatbotComponent } from './features/chatbot/chatbot.component';
 
@@ -61,6 +62,7 @@ export const routes: Routes = [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: 'dashboard', component: SuperAdminDashboardComponent },
       { path: 'hopitaux', component: HospitalsComponent },
+      { path: 'admins', component: AdminManagementComponent },
       { path: 'stats', component: GlobalStatsComponent },
       { path: 'campagnes', component: NationalCampaignsComponent },
       { path: 'notifications', component: GlobalNotificationsComponent },

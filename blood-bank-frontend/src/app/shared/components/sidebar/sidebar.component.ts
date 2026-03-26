@@ -82,6 +82,7 @@ export class SidebarComponent {
   superAdminNav: NavItem[] = [
     { label: 'Dashboard', path: '/superadmin/dashboard', icon: 'dashboard', roles: ['SUPER_ADMIN'] },
     { label: 'Hôpitaux', path: '/superadmin/hopitaux', icon: 'local_hospital', roles: ['SUPER_ADMIN'] },
+    { label: '👥 Admins', path: '/superadmin/admins', icon: 'admin_panel_settings', roles: ['SUPER_ADMIN'] },
     { label: 'Gestion Demandes', path: '/hospital/demandes', icon: 'emergency', roles: ['SUPER_ADMIN'] },
     { label: 'Stats', path: '/superadmin/stats', icon: 'bar_chart', roles: ['SUPER_ADMIN'] },
     { label: 'Campagnes nationales', path: '/superadmin/campagnes', icon: 'campaign', roles: ['SUPER_ADMIN'] },
